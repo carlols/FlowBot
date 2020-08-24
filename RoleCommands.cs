@@ -58,7 +58,7 @@ namespace Flowbot
 
                 if (role == null)
                 {
-                    await ctx.RespondAsync($"{ctx.Member.Mention} the role you input ")
+                    await ctx.RespondAsync($"{ctx.Member.Mention} the role you input "); //TODO: cont here
                 }
             }
             else
