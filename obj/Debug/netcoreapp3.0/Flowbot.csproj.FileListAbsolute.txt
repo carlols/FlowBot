@@ -1,0 +1,15 @@
+E:\Code\Flowbot\bin\Debug\netcoreapp3.0\Flowbot.exe
+E:\Code\Flowbot\bin\Debug\netcoreapp3.0\Flowbot.deps.json
+E:\Code\Flowbot\bin\Debug\netcoreapp3.0\Flowbot.runtimeconfig.json
+E:\Code\Flowbot\bin\Debug\netcoreapp3.0\Flowbot.runtimeconfig.dev.json
+E:\Code\Flowbot\bin\Debug\netcoreapp3.0\Flowbot.dll
+E:\Code\Flowbot\bin\Debug\netcoreapp3.0\Flowbot.pdb
+E:\Code\Flowbot\obj\Debug\netcoreapp3.0\Flowbot.csprojAssemblyReference.cache
+E:\Code\Flowbot\obj\Debug\netcoreapp3.0\Flowbot.AssemblyInfoInputs.cache
+E:\Code\Flowbot\obj\Debug\netcoreapp3.0\Flowbot.AssemblyInfo.cs
+E:\Code\Flowbot\obj\Debug\netcoreapp3.0\Flowbot.dll
+E:\Code\Flowbot\obj\Debug\netcoreapp3.0\Flowbot.pdb
+E:\Code\Flowbot\bin\Debug\netcoreapp3.0\DSharpPlus.dll
+E:\Code\Flowbot\bin\Debug\netcoreapp3.0\Newtonsoft.Json.dll
+E:\Code\Flowbot\obj\Debug\netcoreapp3.0\Flowbot.csproj.CopyComplete
+E:\Code\Flowbot\bin\Debug\netcoreapp3.0\DSharpPlus.CommandsNext.dll
