@@ -27,6 +27,7 @@ builder.Services.AddSingleton(sp =>
 });
 
 builder.Services.AddSingleton<RoleButtonHandler>();
+builder.Services.AddSingleton<GroupFinderButtonHandler>();
 builder.Services.AddHostedService<DiscordBotService>();
 
 var host = builder.Build();

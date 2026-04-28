@@ -8,6 +8,7 @@ FlowBot is a private Discord bot built with .NET 9 and Discord.Net.
 - `Configuration/`: strongly typed configuration objects.
 - `Discord/`: Discord client hosting, connection, and event routing.
 - `Features/`: larger feature areas grouped by domain.
+- `Features/GroupFinder/`: joinable group finder messages for game sessions.
 - `Features/RoleMessages/`: self-assignable role message command and button handling.
 
 ## Local Setup
@@ -55,6 +56,25 @@ Example:
 ```text
 /role-message role:@Raider message:Click below to get raid notifications.
 ```
+
+### `/group-finder`
+
+Creates a joinable group finder message for a game or activity. The creator is automatically added as the first player.
+
+Parameters:
+
+- `game-name`: required game or activity name.
+- `group-size`: required total group size, including the creator. Supports 1-20.
+- `description`: optional message describing what you want to play.
+- `role-to-ping`: optional server role to ping in the initial bot message.
+
+Example:
+
+```text
+/group-finder game-name:Counter-Strike 2 group-size:3 description:Premier queue? role-to-ping:@counterstrike
+```
+
+The message updates as users click `Join group` or `Leave group`. The current player list is stored in the message itself, so existing group finder messages continue to work after FlowBot restarts.
 
 ## Configuration
 

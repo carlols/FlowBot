@@ -10,6 +10,7 @@ public sealed class DiscordBotService(
     DiscordSocketClient client,
     InteractionService interactions,
     RoleButtonHandler roleButtonHandler,
+    GroupFinderButtonHandler groupFinderButtonHandler,
     IServiceProvider services,
     IOptions<FlowBotOptions> options,
     IHostApplicationLifetime lifetime,
@@ -86,6 +87,13 @@ public sealed class DiscordBotService(
             && RoleButtonIds.IsRoleButton(component.Data.CustomId))
         {
             await roleButtonHandler.HandleAsync(component);
+            return;
+        }
+
+        if (interaction is SocketMessageComponent groupFinderComponent
+            && GroupFinderButtonIds.IsGroupFinderButton(groupFinderComponent.Data.CustomId))
+        {
+            await groupFinderButtonHandler.HandleAsync(groupFinderComponent);
             return;
         }
 
