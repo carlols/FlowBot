@@ -74,7 +74,7 @@ Example:
 /group-finder game-name:Counter-Strike 2 group-size:3 description:Premier queue? role-to-ping:@counterstrike
 ```
 
-The message updates as users click `Join group` or `Leave group`. The current player list is stored in the message itself, so existing group finder messages continue to work after FlowBot restarts.
+The message updates as users click `Join group` or `Leave group`. The host or users with `Manage Messages`/`Administrator` can click `Close group` to remove the message. The current player list and host are stored in the message itself, so existing group finder messages continue to work after FlowBot restarts.
 
 ## Configuration
 
