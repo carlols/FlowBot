@@ -7,6 +7,7 @@ public sealed record GroupFinderSession(
     string? Description,
     int Capacity,
     ulong HostUserId,
+    long? StartsAtUnixTimeSeconds,
     IReadOnlyList<ulong> PlayerIds)
 {
     public const int MinCapacity = 1;
@@ -18,13 +19,15 @@ public sealed record GroupFinderSession(
         string gameName,
         string? description,
         int capacity,
-        IUser creator)
+        IUser creator,
+        long? startsAtUnixTimeSeconds)
     {
         return new GroupFinderSession(
             gameName.Trim(),
             string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
             capacity,
             creator.Id,
+            startsAtUnixTimeSeconds,
             [creator.Id]);
     }
 }

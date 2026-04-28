@@ -7,4 +7,6 @@ public sealed class FlowBotOptions
     public string? Token { get; init; }
 
     public ulong? TestGuildId { get; init; }
+
+    public string TimeZone { get; init; } = "Europe/Stockholm";
 }
