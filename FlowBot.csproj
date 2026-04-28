@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-FlowBot-76e54133-256f-41b4-8d2a-ef4c380b6ea3</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Discord.Net" Version="3.19.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.15" />
+  </ItemGroup>
+</Project>
