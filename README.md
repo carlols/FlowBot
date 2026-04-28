@@ -2,6 +2,14 @@
 
 FlowBot is a private Discord bot built with .NET 9 and Discord.Net.
 
+## Project Structure
+
+- `Commands/`: small standalone slash command modules.
+- `Configuration/`: strongly typed configuration objects.
+- `Discord/`: Discord client hosting, connection, and event routing.
+- `Features/`: larger feature areas grouped by domain.
+- `Features/RoleMessages/`: self-assignable role message command and button handling.
+
 ## Local Setup
 
 1. Create a Discord application and bot in the Discord Developer Portal.
