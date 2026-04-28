@@ -7,6 +7,16 @@ public sealed class GroupFinderButtonHandler(ILogger<GroupFinderButtonHandler> l
 {
     public async Task HandleAsync(SocketMessageComponent component)
     {
+        if (GroupFinderButtonIds.TryParseCloseConfirmation(
+            component.Data.CustomId,
+            out var confirmationAction,
+            out var messageId,
+            out var hostUserId))
+        {
+            await HandleCloseConfirmationAsync(component, confirmationAction, messageId, hostUserId);
+            return;
+        }
+
         if (!GroupFinderButtonIds.TryParse(component.Data.CustomId, out var action, out var capacity))
         {
             await component.RespondAsync("I could not identify this group finder button.", ephemeral: true);
@@ -66,14 +76,78 @@ public sealed class GroupFinderButtonHandler(ILogger<GroupFinderButtonHandler> l
             return;
         }
 
+        var components = new ComponentBuilder()
+            .WithButton(
+                label: "Confirm close",
+                customId: GroupFinderButtonIds.CreateConfirmCloseId(component.Message.Id, session.HostUserId),
+                style: ButtonStyle.Danger)
+            .WithButton(
+                label: "Cancel",
+                customId: GroupFinderButtonIds.CreateCancelCloseId(),
+                style: ButtonStyle.Secondary)
+            .Build();
+
+        await component.RespondAsync(
+            "You can close this group. Confirming will delete the group finder message.",
+            components: components,
+            ephemeral: true);
+    }
+
+    private async Task HandleCloseConfirmationAsync(
+        SocketMessageComponent component,
+        GroupFinderButtonAction action,
+        ulong messageId,
+        ulong hostUserId)
+    {
+        if (action == GroupFinderButtonAction.CancelClose)
+        {
+            await component.UpdateAsync(properties =>
+            {
+                properties.Content = "Close cancelled.";
+                properties.Components = new ComponentBuilder().Build();
+            });
+            return;
+        }
+
+        if (!CanCloseGroup(component.User, hostUserId))
+        {
+            await component.UpdateAsync(properties =>
+            {
+                properties.Content = "Only the host or moderators can close this group.";
+                properties.Components = new ComponentBuilder().Build();
+            });
+            return;
+        }
+
         try
         {
-            await component.Message.DeleteAsync();
+            var message = await component.Channel.GetMessageAsync(messageId);
+
+            if (message is null)
+            {
+                await component.UpdateAsync(properties =>
+                {
+                    properties.Content = "That group message no longer exists.";
+                    properties.Components = new ComponentBuilder().Build();
+                });
+                return;
+            }
+
+            await message.DeleteAsync();
+            await component.UpdateAsync(properties =>
+            {
+                properties.Content = "Group closed.";
+                properties.Components = new ComponentBuilder().Build();
+            });
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Failed to delete group finder message {MessageId}.", component.Message.Id);
-            await component.RespondAsync("I could not delete this group message.", ephemeral: true);
+            logger.LogWarning(exception, "Failed to delete group finder message {MessageId}.", messageId);
+            await component.UpdateAsync(properties =>
+            {
+                properties.Content = "I could not delete this group message.";
+                properties.Components = new ComponentBuilder().Build();
+            });
         }
     }
 
