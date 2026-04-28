@@ -66,10 +66,10 @@ public sealed class DiscordBotService(
             return;
         }
 
-        if (_options.TestGuildId is { } guildId)
+        if (_options.ServerId is { } serverId)
         {
-            await interactions.RegisterCommandsToGuildAsync(guildId);
-            logger.LogInformation("Registered slash commands to test guild {GuildId}.", guildId);
+            await interactions.RegisterCommandsToGuildAsync(serverId);
+            logger.LogInformation("Registered slash commands to server {ServerId}.", serverId);
         }
         else
         {

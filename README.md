@@ -24,7 +24,7 @@ FlowBot is a private Discord bot built with .NET 9 and Discord.Net.
 4. For fast slash command updates while testing, set your server ID:
 
    ```powershell
-   dotnet user-secrets set "FlowBot:TestGuildId" "your-discord-server-id"
+   dotnet user-secrets set "FlowBot:ServerId" "your-discord-server-id"
    ```
 
 5. Run FlowBot:
@@ -84,14 +84,14 @@ The message updates as users click `Join group` or `Leave group`. The host or us
 Configuration keys:
 
 - `FlowBot:Token`: Discord bot token. Keep this in user secrets or environment variables.
-- `FlowBot:TestGuildId`: Optional Discord server ID for guild-scoped slash command registration.
+- `FlowBot:ServerId`: Optional Discord server ID for fast server-scoped slash command registration.
 - `FlowBot:TimeZone`: Timezone used for group finder times such as `20:00`. Defaults to `Europe/Stockholm`.
 
 Environment variable equivalents use double underscores:
 
 ```powershell
 $env:FlowBot__Token = "your-bot-token"
-$env:FlowBot__TestGuildId = "your-discord-server-id"
+$env:FlowBot__ServerId = "your-discord-server-id"
 $env:FlowBot__TimeZone = "Europe/Stockholm"
 dotnet run
 ```
