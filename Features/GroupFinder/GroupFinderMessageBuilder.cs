@@ -9,6 +9,7 @@ public static partial class GroupFinderMessageBuilder
     public const string HostFieldName = "Host";
     public const string StartsFieldName = "Starts";
     public const string NoticeFieldName = "Notice";
+    public const string LegacyFullNotificationNotice = "Group filled and players notified.";
     public const string PlayersFieldName = "Players";
 
     public static Embed BuildEmbed(GroupFinderSession session)
@@ -26,36 +27,35 @@ public static partial class GroupFinderMessageBuilder
             embed.AddField(StartsFieldName, $"<t:{startsAt}:f> (<t:{startsAt}:R>)", inline: true);
         }
 
-        if (session.FullNotificationSent)
-        {
-            embed.AddField(NoticeFieldName, "Group filled and players notified.", inline: true);
-        }
-
         embed.AddField(PlayersFieldName, FormatPlayers(session.PlayerIds));
 
         return embed.Build();
     }
 
-    public static MessageComponent BuildComponents(int capacity, int playerCount)
+    public static MessageComponent BuildComponents(int capacity, int playerCount, bool fullNotificationSent)
     {
         return new ComponentBuilder()
             .WithButton(
                 label: "Join group",
-                customId: GroupFinderButtonIds.CreateJoinId(capacity),
+                customId: GroupFinderButtonIds.CreateJoinId(capacity, fullNotificationSent),
                 style: ButtonStyle.Success,
                 disabled: playerCount >= capacity)
             .WithButton(
                 label: "Leave group",
-                customId: GroupFinderButtonIds.CreateLeaveId(capacity),
+                customId: GroupFinderButtonIds.CreateLeaveId(capacity, fullNotificationSent),
                 style: ButtonStyle.Danger)
             .WithButton(
                 label: "Close group",
-                customId: GroupFinderButtonIds.CreateCloseId(capacity),
+                customId: GroupFinderButtonIds.CreateCloseId(capacity, fullNotificationSent),
                 style: ButtonStyle.Danger)
             .Build();
     }
 
-    public static bool TryReadSession(IMessage message, int capacity, out GroupFinderSession session)
+    public static bool TryReadSession(
+        IMessage message,
+        int capacity,
+        bool? fullNotificationSentFromComponents,
+        out GroupFinderSession session)
     {
         session = new GroupFinderSession("Unknown game", null, capacity, 0, null, false, []);
 
@@ -79,7 +79,8 @@ public static partial class GroupFinderMessageBuilder
 
         var hostUserId = ulong.Parse(hostMatch.Groups["id"].Value);
         var startsAtUnixTimeSeconds = TryReadTimestamp(startsField.Value);
-        var fullNotificationSent = noticeField.Value == "Group filled and players notified.";
+        var fullNotificationSent = fullNotificationSentFromComponents
+            ?? noticeField.Value == LegacyFullNotificationNotice;
         var playerIds = PlayerMentionRegex()
             .Matches(playersField.Value ?? string.Empty)
             .Select(match => ulong.Parse(match.Groups["id"].Value))
