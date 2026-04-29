@@ -17,13 +17,21 @@ public sealed class GroupFinderButtonHandler(ILogger<GroupFinderButtonHandler> l
             return;
         }
 
-        if (!GroupFinderButtonIds.TryParse(component.Data.CustomId, out var action, out var capacity))
+        if (!GroupFinderButtonIds.TryParse(
+            component.Data.CustomId,
+            out var action,
+            out var capacity,
+            out var fullNotificationSentFromComponents))
         {
             await component.RespondAsync("I could not identify this group finder button.", ephemeral: true);
             return;
         }
 
-        if (!GroupFinderMessageBuilder.TryReadSession(component.Message, capacity, out var session))
+        if (!GroupFinderMessageBuilder.TryReadSession(
+            component.Message,
+            capacity,
+            fullNotificationSentFromComponents,
+            out var session))
         {
             await component.RespondAsync("I could not read this group finder message.", ephemeral: true);
             return;
@@ -191,7 +199,10 @@ public sealed class GroupFinderButtonHandler(ILogger<GroupFinderButtonHandler> l
             await component.UpdateAsync(properties =>
             {
                 properties.Embed = GroupFinderMessageBuilder.BuildEmbed(session);
-                properties.Components = GroupFinderMessageBuilder.BuildComponents(session.Capacity, session.PlayerIds.Count);
+                properties.Components = GroupFinderMessageBuilder.BuildComponents(
+                    session.Capacity,
+                    session.PlayerIds.Count,
+                    session.FullNotificationSent);
             });
         }
         catch (Exception exception)
