@@ -5,8 +5,8 @@ namespace FlowBot;
 
 public sealed class GroupFinderTimeParser(IOptions<FlowBotOptions> options, ILogger<GroupFinderTimeParser> logger)
 {
-    private static readonly string[] TimeFormats = ["H:mm", "HH:mm"];
-    private static readonly string[] DateTimeFormats = ["yyyy-MM-dd H:mm", "yyyy-MM-dd HH:mm"];
+    private static readonly string[] TimeFormats = ["H:mm", "HH:mm", "H.mm", "HH.mm"];
+    private static readonly string[] DateTimeFormats = ["yyyy-MM-dd H:mm", "yyyy-MM-dd HH:mm", "yyyy-MM-dd H.mm", "yyyy-MM-dd HH.mm"];
 
     public bool TryParse(string? input, out long? unixTimeSeconds, out string errorMessage)
     {
@@ -27,7 +27,7 @@ public sealed class GroupFinderTimeParser(IOptions<FlowBotOptions> options, ILog
             return true;
         }
 
-        errorMessage = "I could not understand that time. Try `20:00`, `tomorrow 20:00`, or `2026-04-28 20:00`.";
+        errorMessage = "I could not understand that time. Try `20:00`, `17.00`, `tomorrow 20:00`, or `2026-04-28 20:00`.";
         return false;
     }
 

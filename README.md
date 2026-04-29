@@ -67,7 +67,7 @@ Parameters:
 - `group-size`: required total group size, including the creator. Supports 1-20.
 - `description`: optional message describing what you want to play.
 - `role-to-ping`: optional server role to ping in the initial bot message.
-- `time`: optional start time. Supports `20:00`, `today 20:00`, `tomorrow 20:00`, and `2026-04-28 20:00`.
+- `time`: optional start time. Supports `20:00`, `17.00`, `today 20:00`, `tomorrow 20:00`, and `2026-04-28 20:00`.
 
 Example:
 
@@ -75,7 +75,7 @@ Example:
 /group-finder game-name:Counter-Strike 2 group-size:3 description:Premier queue? role-to-ping:@counterstrike time:20:00
 ```
 
-When `time` is provided, FlowBot renders it as a Discord timestamp like `<t:...:f> (<t:...:R>)`, so Discord shows the time in each viewer's local timezone plus a live relative countdown. Plain times are interpreted in `FlowBot:TimeZone`; `20:00` means the next upcoming 20:00 in that timezone.
+When `time` is provided, FlowBot renders it as a Discord timestamp like `<t:...:f> (<t:...:R>)`, so Discord shows the time in each viewer's local timezone plus a live relative countdown. Plain times are interpreted in `FlowBot:TimeZone`; `20:00` or `20.00` means the next upcoming 20:00 in that timezone.
 
 The message updates as users click `Join group` or `Leave group`. The host or users with `Manage Messages`/`Administrator` can click `Close group`, then confirm, to remove the message. The current player list, host, and start time are stored in the message itself, so existing group finder messages continue to work after FlowBot restarts.
 
