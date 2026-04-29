@@ -54,7 +54,17 @@ public sealed class GroupFinderButtonHandler(ILogger<GroupFinderButtonHandler> l
             }
 
             playerIds.Add(userId);
-            await UpdateGroupMessageAsync(component, session with { PlayerIds = playerIds });
+            var updatedSession = session with { PlayerIds = playerIds };
+
+            if (updatedSession.IsFull && !session.FullNotificationSent)
+            {
+                updatedSession = updatedSession with { FullNotificationSent = true };
+                await UpdateGroupMessageAsync(component, updatedSession);
+                await SendFullGroupNotificationAsync(component, updatedSession);
+                return;
+            }
+
+            await UpdateGroupMessageAsync(component, updatedSession);
             return;
         }
 
@@ -66,6 +76,17 @@ public sealed class GroupFinderButtonHandler(ILogger<GroupFinderButtonHandler> l
 
         playerIds.Remove(userId);
         await UpdateGroupMessageAsync(component, session with { PlayerIds = playerIds });
+    }
+
+    private static async Task SendFullGroupNotificationAsync(
+        SocketMessageComponent component,
+        GroupFinderSession session)
+    {
+        var playerMentions = string.Join(" ", session.PlayerIds.Select(playerId => $"<@{playerId}>"));
+
+        await component.Channel.SendMessageAsync(
+            text: $"Your group for **{session.GameName}** is full!\n{playerMentions}",
+            allowedMentions: new AllowedMentions { UserIds = session.PlayerIds.ToList() });
     }
 
     private async Task CloseGroupAsync(SocketMessageComponent component, GroupFinderSession session)

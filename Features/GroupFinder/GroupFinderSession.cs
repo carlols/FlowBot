@@ -8,6 +8,7 @@ public sealed record GroupFinderSession(
     int Capacity,
     ulong HostUserId,
     long? StartsAtUnixTimeSeconds,
+    bool FullNotificationSent,
     IReadOnlyList<ulong> PlayerIds)
 {
     public const int MinCapacity = 1;
@@ -28,6 +29,7 @@ public sealed record GroupFinderSession(
             capacity,
             creator.Id,
             startsAtUnixTimeSeconds,
+            false,
             [creator.Id]);
     }
 }

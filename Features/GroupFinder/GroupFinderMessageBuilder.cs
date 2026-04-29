@@ -8,6 +8,7 @@ public static partial class GroupFinderMessageBuilder
     public const string StatusFieldName = "Group";
     public const string HostFieldName = "Host";
     public const string StartsFieldName = "Starts";
+    public const string NoticeFieldName = "Notice";
     public const string PlayersFieldName = "Players";
 
     public static Embed BuildEmbed(GroupFinderSession session)
@@ -23,6 +24,11 @@ public static partial class GroupFinderMessageBuilder
         if (session.StartsAtUnixTimeSeconds is { } startsAt)
         {
             embed.AddField(StartsFieldName, $"<t:{startsAt}:f> (<t:{startsAt}:R>)", inline: true);
+        }
+
+        if (session.FullNotificationSent)
+        {
+            embed.AddField(NoticeFieldName, "Group filled and players notified.", inline: true);
         }
 
         embed.AddField(PlayersFieldName, FormatPlayers(session.PlayerIds));
@@ -51,7 +57,7 @@ public static partial class GroupFinderMessageBuilder
 
     public static bool TryReadSession(IMessage message, int capacity, out GroupFinderSession session)
     {
-        session = new GroupFinderSession("Unknown game", null, capacity, 0, null, []);
+        session = new GroupFinderSession("Unknown game", null, capacity, 0, null, false, []);
 
         var embed = message.Embeds.FirstOrDefault();
 
@@ -62,6 +68,7 @@ public static partial class GroupFinderMessageBuilder
 
         var hostField = embed.Fields.FirstOrDefault(field => field.Name == HostFieldName);
         var startsField = embed.Fields.FirstOrDefault(field => field.Name == StartsFieldName);
+        var noticeField = embed.Fields.FirstOrDefault(field => field.Name == NoticeFieldName);
         var playersField = embed.Fields.FirstOrDefault(field => field.Name == PlayersFieldName);
         var hostMatch = PlayerMentionRegex().Match(hostField.Value ?? string.Empty);
 
@@ -72,13 +79,21 @@ public static partial class GroupFinderMessageBuilder
 
         var hostUserId = ulong.Parse(hostMatch.Groups["id"].Value);
         var startsAtUnixTimeSeconds = TryReadTimestamp(startsField.Value);
+        var fullNotificationSent = noticeField.Value == "Group filled and players notified.";
         var playerIds = PlayerMentionRegex()
             .Matches(playersField.Value ?? string.Empty)
             .Select(match => ulong.Parse(match.Groups["id"].Value))
             .Distinct()
             .ToArray();
 
-        session = new GroupFinderSession(embed.Title, embed.Description, capacity, hostUserId, startsAtUnixTimeSeconds, playerIds);
+        session = new GroupFinderSession(
+            embed.Title,
+            embed.Description,
+            capacity,
+            hostUserId,
+            startsAtUnixTimeSeconds,
+            fullNotificationSent,
+            playerIds);
         return true;
     }
 
