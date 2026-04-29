@@ -1,0 +1,12 @@
+app = "flowbot"
+primary_region = "arn"
+kill_signal = "SIGINT"
+kill_timeout = "5s"
+
+[env]
+  FlowBot__TimeZone = "Europe/Stockholm"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"

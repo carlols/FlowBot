@@ -95,3 +95,42 @@ $env:FlowBot__ServerId = "your-discord-server-id"
 $env:FlowBot__TimeZone = "Europe/Stockholm"
 dotnet run
 ```
+
+## Fly.io Deployment
+
+FlowBot runs as a long-lived worker process. It does not expose an HTTP service.
+
+Install and log in with Fly:
+
+```powershell
+iwr https://fly.io/install.ps1 -useb | iex
+fly auth login
+```
+
+Create the app without deploying first:
+
+```powershell
+fly launch --no-deploy
+```
+
+The starter `fly.toml` uses `flowbot` as the Fly app name and `arn` as the primary region. If `flowbot` is already taken, choose another Fly app name; the Discord bot can still be named FlowBot.
+
+Set secrets:
+
+```powershell
+fly secrets set FlowBot__Token="your-bot-token"
+fly secrets set FlowBot__ServerId="your-discord-server-id"
+fly secrets set FlowBot__TimeZone="Europe/Stockholm"
+```
+
+Deploy:
+
+```powershell
+fly deploy
+```
+
+Watch logs:
+
+```powershell
+fly logs
+```
