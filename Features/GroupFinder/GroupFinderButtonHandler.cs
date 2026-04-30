@@ -7,6 +7,24 @@ public sealed class GroupFinderButtonHandler(ILogger<GroupFinderButtonHandler> l
 {
     public async Task HandleAsync(SocketMessageComponent component)
     {
+        if (GroupFinderButtonIds.TryParseStartConfirmation(
+            component.Data.CustomId,
+            out var startConfirmationAction,
+            out var startMessageId,
+            out var startHostUserId,
+            out var startCapacity,
+            out var startFullNotificationSentFromComponents))
+        {
+            await HandleStartConfirmationAsync(
+                component,
+                startConfirmationAction,
+                startMessageId,
+                startHostUserId,
+                startCapacity,
+                startFullNotificationSentFromComponents);
+            return;
+        }
+
         if (GroupFinderButtonIds.TryParseCloseConfirmation(
             component.Data.CustomId,
             out var confirmationAction,
@@ -47,6 +65,12 @@ public sealed class GroupFinderButtonHandler(ILogger<GroupFinderButtonHandler> l
             return;
         }
 
+        if (action == GroupFinderButtonAction.Start)
+        {
+            await StartSessionAsync(component, session);
+            return;
+        }
+
         if (action == GroupFinderButtonAction.Join)
         {
             if (isRegistered)
@@ -55,7 +79,7 @@ public sealed class GroupFinderButtonHandler(ILogger<GroupFinderButtonHandler> l
                 return;
             }
 
-            if (playerIds.Count >= session.Capacity)
+            if (session.IsFull)
             {
                 await component.RespondAsync("This group is already full.", ephemeral: true);
                 return;
@@ -68,7 +92,10 @@ public sealed class GroupFinderButtonHandler(ILogger<GroupFinderButtonHandler> l
             {
                 updatedSession = updatedSession with { FullNotificationSent = true };
                 await UpdateGroupMessageAsync(component, updatedSession);
-                await SendFullGroupNotificationAsync(component, updatedSession);
+                await SendGroupNotificationAsync(
+                    component.Channel,
+                    updatedSession,
+                    $"Your group for **{updatedSession.GameName}** is full!");
                 return;
             }
 
@@ -86,15 +113,151 @@ public sealed class GroupFinderButtonHandler(ILogger<GroupFinderButtonHandler> l
         await UpdateGroupMessageAsync(component, session with { PlayerIds = playerIds });
     }
 
-    private static async Task SendFullGroupNotificationAsync(
-        SocketMessageComponent component,
-        GroupFinderSession session)
+    private static async Task SendGroupNotificationAsync(
+        IMessageChannel channel,
+        GroupFinderSession session,
+        string message)
     {
         var playerMentions = string.Join(" ", session.PlayerIds.Select(playerId => $"<@{playerId}>"));
 
-        await component.Channel.SendMessageAsync(
-            text: $"Your group for **{session.GameName}** is full!\n{playerMentions}",
+        await channel.SendMessageAsync(
+            text: $"{message}\n{playerMentions}",
             allowedMentions: new AllowedMentions { UserIds = session.PlayerIds.ToList() });
+    }
+
+    private async Task StartSessionAsync(SocketMessageComponent component, GroupFinderSession session)
+    {
+        if (component.User.Id != session.HostUserId)
+        {
+            await component.RespondAsync("Only the group creator can start this session.", ephemeral: true);
+            return;
+        }
+
+        if (session.FullNotificationSent)
+        {
+            await component.RespondAsync("This group has already notified its players.", ephemeral: true);
+            return;
+        }
+
+        var components = new ComponentBuilder()
+            .WithButton(
+                label: "Confirm start",
+                customId: GroupFinderButtonIds.CreateConfirmStartId(
+                    component.Message.Id,
+                    session.HostUserId,
+                    session.Capacity,
+                    session.FullNotificationSent),
+                style: ButtonStyle.Primary)
+            .WithButton(
+                label: "Cancel",
+                customId: GroupFinderButtonIds.CreateCancelStartId(),
+                style: ButtonStyle.Secondary)
+            .Build();
+
+        await component.RespondAsync(
+            "Starting this session will ping every registered player.",
+            components: components,
+            ephemeral: true);
+    }
+
+    private async Task HandleStartConfirmationAsync(
+        SocketMessageComponent component,
+        GroupFinderButtonAction action,
+        ulong messageId,
+        ulong hostUserId,
+        int? capacity,
+        bool? fullNotificationSentFromComponents)
+    {
+        if (action == GroupFinderButtonAction.CancelStart)
+        {
+            await component.UpdateAsync(properties =>
+            {
+                properties.Content = "Start cancelled.";
+                properties.Components = new ComponentBuilder().Build();
+            });
+            return;
+        }
+
+        if (component.User.Id != hostUserId)
+        {
+            await component.UpdateAsync(properties =>
+            {
+                properties.Content = "Only the group creator can start this session.";
+                properties.Components = new ComponentBuilder().Build();
+            });
+            return;
+        }
+
+        try
+        {
+            var message = await component.Channel.GetMessageAsync(messageId);
+
+            if (message is not IUserMessage userMessage)
+            {
+                await component.UpdateAsync(properties =>
+                {
+                    properties.Content = "That group message no longer exists.";
+                    properties.Components = new ComponentBuilder().Build();
+                });
+                return;
+            }
+
+            if (!GroupFinderMessageBuilder.TryReadSession(
+                userMessage,
+                capacity,
+                fullNotificationSentFromComponents,
+                out var session)
+                || session.HostUserId != hostUserId)
+            {
+                await component.UpdateAsync(properties =>
+                {
+                    properties.Content = "I could not read that group finder message.";
+                    properties.Components = new ComponentBuilder().Build();
+                });
+                return;
+            }
+
+            if (session.FullNotificationSent)
+            {
+                await component.UpdateAsync(properties =>
+                {
+                    properties.Content = "This group has already notified its players.";
+                    properties.Components = new ComponentBuilder().Build();
+                });
+                return;
+            }
+
+            var updatedSession = session with { FullNotificationSent = true };
+
+            await userMessage.ModifyAsync(properties =>
+            {
+                properties.Embed = GroupFinderMessageBuilder.BuildEmbed(updatedSession);
+                properties.Components = GroupFinderMessageBuilder.BuildComponents(
+                    updatedSession.Capacity,
+                    updatedSession.PlayerIds.Count,
+                    updatedSession.FullNotificationSent);
+            });
+
+            await SendGroupNotificationAsync(
+                component.Channel,
+                updatedSession,
+                $"**{updatedSession.GameName}** is starting!");
+
+            await component.UpdateAsync(properties =>
+            {
+                properties.Content = "Session started. Registered players have been notified.";
+                properties.Components = new ComponentBuilder().Build();
+            });
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Failed to start group finder session for message {MessageId}.", messageId);
+            await component.UpdateAsync(properties =>
+            {
+                properties.Content = "I could not start this session.";
+                properties.Components = new ComponentBuilder().Build();
+            });
+        }
     }
 
     private async Task CloseGroupAsync(SocketMessageComponent component, GroupFinderSession session)
