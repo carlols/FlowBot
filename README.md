@@ -64,7 +64,7 @@ Creates a joinable group finder message for a game or activity. The creator is a
 Parameters:
 
 - `game-name`: required game or activity name.
-- `group-size`: required total group size, including the creator. Supports 1-20.
+- `group-size`: optional total group size, including the creator. Supports 1-30. Leave it empty for an open-ended group.
 - `description`: optional message describing what you want to play.
 - `role-to-ping`: optional server role to ping in the initial bot message.
 - `time`: optional start time. Supports `20:00`, `17.00`, `today 20:00`, `tomorrow 20:00`, and `2026-04-28 20:00`.
@@ -78,6 +78,8 @@ Example:
 When `time` is provided, FlowBot renders it as a Discord timestamp like `<t:...:f> (<t:...:R>)`, so Discord shows the time in each viewer's local timezone plus a live relative countdown. Plain times are interpreted in `FlowBot:TimeZone`; `20:00` or `20.00` means the next upcoming 20:00 in that timezone.
 
 The message updates as users click `Join group` or `Leave group`. When the group fills for the first time, FlowBot posts a follow-up message mentioning each registered player. The host or users with `Manage Messages`/`Administrator` can click `Close group`, then confirm, to remove the message. The current player list, host, start time, and full-group notification state are stored in the Discord message/embed/components, so existing group finder messages continue to work after FlowBot restarts.
+
+The group creator can also click `Start session`, then confirm, to manually ping every registered player. This is useful for open-ended groups or fixed-size groups that are ready to begin before reaching capacity. Starting a session marks the group as already notified, so FlowBot will not send a second automatic full-group ping later.
 
 ## Configuration
 

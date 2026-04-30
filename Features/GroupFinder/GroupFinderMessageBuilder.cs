@@ -17,10 +17,10 @@ public static partial class GroupFinderMessageBuilder
         var embed = new EmbedBuilder()
             .WithTitle(session.GameName)
             .WithDescription(session.Description ?? "Looking for players.")
-            .AddField(StatusFieldName, $"{session.PlayerIds.Count}/{session.Capacity} people in group", inline: true)
+            .AddField(StatusFieldName, FormatStatus(session), inline: true)
             .AddField(HostFieldName, $"<@{session.HostUserId}>", inline: true)
             .WithColor(new Color(87, 242, 135))
-            .WithFooter("Use the buttons below to join, leave, or close this group.");
+            .WithFooter("Use the buttons below to join, leave, start, or close this group.");
 
         if (session.StartsAtUnixTimeSeconds is { } startsAt)
         {
@@ -32,18 +32,22 @@ public static partial class GroupFinderMessageBuilder
         return embed.Build();
     }
 
-    public static MessageComponent BuildComponents(int capacity, int playerCount, bool fullNotificationSent)
+    public static MessageComponent BuildComponents(int? capacity, int playerCount, bool fullNotificationSent)
     {
         return new ComponentBuilder()
             .WithButton(
                 label: "Join group",
                 customId: GroupFinderButtonIds.CreateJoinId(capacity, fullNotificationSent),
                 style: ButtonStyle.Success,
-                disabled: playerCount >= capacity)
+                disabled: capacity is { } maxPlayers && playerCount >= maxPlayers)
             .WithButton(
                 label: "Leave group",
                 customId: GroupFinderButtonIds.CreateLeaveId(capacity, fullNotificationSent),
                 style: ButtonStyle.Danger)
+            .WithButton(
+                label: "Start session",
+                customId: GroupFinderButtonIds.CreateStartId(capacity, fullNotificationSent),
+                style: ButtonStyle.Primary)
             .WithButton(
                 label: "Close group",
                 customId: GroupFinderButtonIds.CreateCloseId(capacity, fullNotificationSent),
@@ -53,7 +57,7 @@ public static partial class GroupFinderMessageBuilder
 
     public static bool TryReadSession(
         IMessage message,
-        int capacity,
+        int? capacity,
         bool? fullNotificationSentFromComponents,
         out GroupFinderSession session)
     {
@@ -96,6 +100,16 @@ public static partial class GroupFinderMessageBuilder
             fullNotificationSent,
             playerIds);
         return true;
+    }
+
+    private static string FormatStatus(GroupFinderSession session)
+    {
+        if (session.Capacity is { } capacity)
+        {
+            return $"{session.PlayerIds.Count}/{capacity} people in group";
+        }
+
+        return $"{session.PlayerIds.Count} people in group";
     }
 
     private static long? TryReadTimestamp(string? value)
