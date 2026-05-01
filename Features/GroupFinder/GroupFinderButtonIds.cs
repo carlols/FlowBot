@@ -49,50 +49,33 @@ public static class GroupFinderButtonIds
         || customId.StartsWith(ConfirmClosePrefix, StringComparison.Ordinal)
         || customId.StartsWith(CancelClosePrefix, StringComparison.Ordinal);
 
-    public static bool TryParse(
-        string customId,
-        out GroupFinderButtonAction action,
-        out int? capacity,
-        out bool? capacityNoticeSent,
-        out bool? sessionStarted)
+    public static bool TryParse(string customId, out GroupFinderButtonState state)
     {
-        if (TryParse(customId, JoinPrefix, GroupFinderButtonAction.Join, out action, out capacity, out capacityNoticeSent, out sessionStarted))
+        if (TryParse(customId, JoinPrefix, GroupFinderButtonAction.Join, out state))
         {
             return true;
         }
 
-        if (TryParse(customId, LeavePrefix, GroupFinderButtonAction.Leave, out action, out capacity, out capacityNoticeSent, out sessionStarted))
+        if (TryParse(customId, LeavePrefix, GroupFinderButtonAction.Leave, out state))
         {
             return true;
         }
 
-        if (TryParse(customId, StartPrefix, GroupFinderButtonAction.Start, out action, out capacity, out capacityNoticeSent, out sessionStarted))
+        if (TryParse(customId, StartPrefix, GroupFinderButtonAction.Start, out state))
         {
             return true;
         }
 
-        return TryParse(customId, ClosePrefix, GroupFinderButtonAction.Close, out action, out capacity, out capacityNoticeSent, out sessionStarted);
+        return TryParse(customId, ClosePrefix, GroupFinderButtonAction.Close, out state);
     }
 
-    public static bool TryParseStartConfirmation(
-        string customId,
-        out GroupFinderButtonAction action,
-        out ulong messageId,
-        out ulong hostUserId,
-        out int? capacity,
-        out bool? capacityNoticeSent,
-        out bool? sessionStarted)
+    public static bool TryParseStartConfirmation(string customId, out GroupFinderStartConfirmation confirmation)
     {
-        action = GroupFinderButtonAction.ConfirmStart;
-        messageId = 0;
-        hostUserId = 0;
-        capacity = null;
-        capacityNoticeSent = null;
-        sessionStarted = null;
+        confirmation = new GroupFinderStartConfirmation(GroupFinderButtonAction.ConfirmStart, 0, 0, null, null, null);
 
         if (customId == CancelStartPrefix)
         {
-            action = GroupFinderButtonAction.CancelStart;
+            confirmation = confirmation with { Action = GroupFinderButtonAction.CancelStart };
             return true;
         }
 
@@ -104,12 +87,15 @@ public static class GroupFinderButtonIds
         var values = customId[ConfirmStartPrefix.Length..].Split(':', StringSplitOptions.RemoveEmptyEntries);
 
         if (values.Length is < 3 or > 5
-            || !ulong.TryParse(values[0], out messageId)
-            || !ulong.TryParse(values[1], out hostUserId)
-            || !TryParseCapacity(values[2], out capacity))
+            || !ulong.TryParse(values[0], out var messageId)
+            || !ulong.TryParse(values[1], out var hostUserId)
+            || !TryParseCapacity(values[2], out var capacity))
         {
             return false;
         }
+
+        bool? capacityNoticeSent = null;
+        bool? sessionStarted = null;
 
         if (values.Length == 4)
         {
@@ -123,22 +109,23 @@ public static class GroupFinderButtonIds
             sessionStarted = values[4] == "1";
         }
 
+        confirmation = new GroupFinderStartConfirmation(
+            GroupFinderButtonAction.ConfirmStart,
+            messageId,
+            hostUserId,
+            capacity,
+            capacityNoticeSent,
+            sessionStarted);
         return true;
     }
 
-    public static bool TryParseCloseConfirmation(
-        string customId,
-        out GroupFinderButtonAction action,
-        out ulong messageId,
-        out ulong hostUserId)
+    public static bool TryParseCloseConfirmation(string customId, out GroupFinderCloseConfirmation confirmation)
     {
-        action = GroupFinderButtonAction.ConfirmClose;
-        messageId = 0;
-        hostUserId = 0;
+        confirmation = new GroupFinderCloseConfirmation(GroupFinderButtonAction.ConfirmClose, 0, 0);
 
         if (customId == CancelClosePrefix)
         {
-            action = GroupFinderButtonAction.CancelClose;
+            confirmation = confirmation with { Action = GroupFinderButtonAction.CancelClose };
             return true;
         }
 
@@ -149,24 +136,27 @@ public static class GroupFinderButtonIds
 
         var values = customId[ConfirmClosePrefix.Length..].Split(':', StringSplitOptions.RemoveEmptyEntries);
 
-        return values.Length == 2
-            && ulong.TryParse(values[0], out messageId)
-            && ulong.TryParse(values[1], out hostUserId);
+        if (values.Length != 2
+            || !ulong.TryParse(values[0], out var messageId)
+            || !ulong.TryParse(values[1], out var hostUserId))
+        {
+            return false;
+        }
+
+        confirmation = new GroupFinderCloseConfirmation(
+            GroupFinderButtonAction.ConfirmClose,
+            messageId,
+            hostUserId);
+        return true;
     }
 
     private static bool TryParse(
         string customId,
         string prefix,
         GroupFinderButtonAction expectedAction,
-        out GroupFinderButtonAction action,
-        out int? capacity,
-        out bool? capacityNoticeSent,
-        out bool? sessionStarted)
+        out GroupFinderButtonState state)
     {
-        action = expectedAction;
-        capacity = null;
-        capacityNoticeSent = null;
-        sessionStarted = null;
+        state = new GroupFinderButtonState(expectedAction, null, null, null);
 
         if (!customId.StartsWith(prefix, StringComparison.Ordinal))
         {
@@ -176,10 +166,13 @@ public static class GroupFinderButtonIds
         var values = customId[prefix.Length..].Split(':', StringSplitOptions.RemoveEmptyEntries);
 
         if (values.Length is < 1 or > 3
-            || !TryParseCapacity(values[0], out capacity))
+            || !TryParseCapacity(values[0], out var capacity))
         {
             return false;
         }
+
+        bool? capacityNoticeSent = null;
+        bool? sessionStarted = null;
 
         if (values.Length == 2)
         {
@@ -193,6 +186,7 @@ public static class GroupFinderButtonIds
             sessionStarted = values[2] == "1";
         }
 
+        state = new GroupFinderButtonState(expectedAction, capacity, capacityNoticeSent, sessionStarted);
         return true;
     }
 
