@@ -32,25 +32,30 @@ public static partial class GroupFinderMessageBuilder
         return embed.Build();
     }
 
-    public static MessageComponent BuildComponents(int? capacity, int playerCount, bool fullNotificationSent)
+    public static MessageComponent BuildComponents(
+        int? capacity,
+        int playerCount,
+        bool capacityNoticeSent,
+        bool sessionStarted)
     {
         return new ComponentBuilder()
             .WithButton(
                 label: "Join group",
-                customId: GroupFinderButtonIds.CreateJoinId(capacity, fullNotificationSent),
+                customId: GroupFinderButtonIds.CreateJoinId(capacity, capacityNoticeSent, sessionStarted),
                 style: ButtonStyle.Success,
                 disabled: capacity is { } maxPlayers && playerCount >= maxPlayers)
             .WithButton(
                 label: "Leave group",
-                customId: GroupFinderButtonIds.CreateLeaveId(capacity, fullNotificationSent),
+                customId: GroupFinderButtonIds.CreateLeaveId(capacity, capacityNoticeSent, sessionStarted),
                 style: ButtonStyle.Danger)
             .WithButton(
                 label: "Start session",
-                customId: GroupFinderButtonIds.CreateStartId(capacity, fullNotificationSent),
-                style: ButtonStyle.Primary)
+                customId: GroupFinderButtonIds.CreateStartId(capacity, capacityNoticeSent, sessionStarted),
+                style: ButtonStyle.Primary,
+                disabled: sessionStarted)
             .WithButton(
                 label: "Close group",
-                customId: GroupFinderButtonIds.CreateCloseId(capacity, fullNotificationSent),
+                customId: GroupFinderButtonIds.CreateCloseId(capacity, capacityNoticeSent, sessionStarted),
                 style: ButtonStyle.Danger)
             .Build();
     }
@@ -58,10 +63,11 @@ public static partial class GroupFinderMessageBuilder
     public static bool TryReadSession(
         IMessage message,
         int? capacity,
-        bool? fullNotificationSentFromComponents,
+        bool? capacityNoticeSentFromComponents,
+        bool? sessionStartedFromComponents,
         out GroupFinderSession session)
     {
-        session = new GroupFinderSession("Unknown game", null, capacity, 0, null, false, []);
+        session = new GroupFinderSession("Unknown game", null, capacity, 0, null, false, false, []);
 
         var embed = message.Embeds.FirstOrDefault();
 
@@ -83,7 +89,9 @@ public static partial class GroupFinderMessageBuilder
 
         var hostUserId = ulong.Parse(hostMatch.Groups["id"].Value);
         var startsAtUnixTimeSeconds = TryReadTimestamp(startsField.Value);
-        var fullNotificationSent = fullNotificationSentFromComponents
+        var capacityNoticeSent = capacityNoticeSentFromComponents
+            ?? noticeField.Value == LegacyFullNotificationNotice;
+        var sessionStarted = sessionStartedFromComponents
             ?? noticeField.Value == LegacyFullNotificationNotice;
         var playerIds = PlayerMentionRegex()
             .Matches(playersField.Value ?? string.Empty)
@@ -97,7 +105,8 @@ public static partial class GroupFinderMessageBuilder
             capacity,
             hostUserId,
             startsAtUnixTimeSeconds,
-            fullNotificationSent,
+            capacityNoticeSent,
+            sessionStarted,
             playerIds);
         return true;
     }
