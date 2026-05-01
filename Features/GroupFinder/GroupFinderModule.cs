@@ -26,7 +26,8 @@ public sealed class GroupFinderModule(GroupFinderTimeParser timeParser) : Intera
         var components = GroupFinderMessageBuilder.BuildComponents(
             groupSize,
             session.PlayerIds.Count,
-            session.FullNotificationSent);
+            session.CapacityNoticeSent,
+            session.SessionStarted);
 
         await RespondAsync("Group finder created.", ephemeral: true);
 

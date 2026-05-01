@@ -77,9 +77,9 @@ Example:
 
 When `time` is provided, FlowBot renders it as a Discord timestamp like `<t:...:f> (<t:...:R>)`, so Discord shows the time in each viewer's local timezone plus a live relative countdown. Plain times are interpreted in `FlowBot:TimeZone`; `20:00` or `20.00` means the next upcoming 20:00 in that timezone.
 
-The message updates as users click `Join group` or `Leave group`. When the group fills for the first time, FlowBot posts a follow-up message mentioning each registered player. The host or users with `Manage Messages`/`Administrator` can click `Close group`, then confirm, to remove the message. The current player list, host, start time, and full-group notification state are stored in the Discord message/embed/components, so existing group finder messages continue to work after FlowBot restarts.
+The message updates as users click `Join group` or `Leave group`. When a fixed-size group fills for the first time, FlowBot sends the group creator a DM with a link back to the group message. The host or users with `Manage Messages`/`Administrator` can click `Close group`, then confirm, to remove the message. The current player list, host, start time, capacity notice state, and session started state are stored in the Discord message/embed/components, so existing group finder messages continue to work after FlowBot restarts.
 
-The group creator can also click `Start session`, then confirm, to manually ping every registered player. This is useful for open-ended groups or fixed-size groups that are ready to begin before reaching capacity. Starting a session marks the group as already notified, so FlowBot will not send a second automatic full-group ping later.
+The group creator can also click `Start session`, then confirm, to manually ping every registered player. This is useful for open-ended groups or fixed-size groups that are ready to begin before reaching capacity. FlowBot only pings registered players when the creator starts the session.
 
 ## Configuration
 
