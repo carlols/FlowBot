@@ -293,7 +293,7 @@ public sealed class GroupFinderButtonHandler(
             await SendGroupNotificationAsync(
                 component.Channel,
                 updatedSession,
-                $"**{updatedSession.GameName}** is starting!");
+                $"**{updatedSession.GameName}** is starting. Time to group up!");
 
             await component.UpdateAsync(properties =>
             {
