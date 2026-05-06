@@ -20,7 +20,7 @@ public static partial class GroupFinderMessageBuilder
             .AddField(StatusFieldName, FormatStatus(session), inline: true)
             .AddField(HostFieldName, $"<@{session.HostUserId}>", inline: true)
             .WithColor(new Color(87, 242, 135))
-            .WithFooter("Use the buttons below to join, leave, start, or close this group.");
+            .WithFooter("The group creator can start the session when everyone is ready.");
 
         if (session.StartsAtUnixTimeSeconds is { } startsAt)
         {
@@ -40,21 +40,21 @@ public static partial class GroupFinderMessageBuilder
     {
         return new ComponentBuilder()
             .WithButton(
-                label: "Join group",
+                label: "Join",
                 customId: GroupFinderButtonIds.CreateJoinId(capacity, capacityNoticeSent, sessionStarted),
                 style: ButtonStyle.Success,
                 disabled: capacity is { } maxPlayers && playerCount >= maxPlayers)
             .WithButton(
-                label: "Leave group",
+                label: "Leave",
                 customId: GroupFinderButtonIds.CreateLeaveId(capacity, capacityNoticeSent, sessionStarted),
                 style: ButtonStyle.Danger)
             .WithButton(
-                label: "Start session",
+                label: "Start",
                 customId: GroupFinderButtonIds.CreateStartId(capacity, capacityNoticeSent, sessionStarted),
                 style: ButtonStyle.Primary,
                 disabled: sessionStarted)
             .WithButton(
-                label: "Close group",
+                label: "Close",
                 customId: GroupFinderButtonIds.CreateCloseId(capacity, capacityNoticeSent, sessionStarted),
                 style: ButtonStyle.Danger)
             .Build();
@@ -115,10 +115,14 @@ public static partial class GroupFinderMessageBuilder
     {
         if (session.Capacity is { } capacity)
         {
-            return $"{session.PlayerIds.Count}/{capacity} people in group";
+            var status = $"{session.PlayerIds.Count}/{capacity} players joined";
+
+            return session.IsFull
+                ? $"{status} - full"
+                : status;
         }
 
-        return $"{session.PlayerIds.Count} people in group";
+        return $"{session.PlayerIds.Count} people interested";
     }
 
     private static long? TryReadTimestamp(string? value)
