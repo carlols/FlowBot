@@ -36,10 +36,14 @@ FlowBot is a private Discord bot built with .NET 9 and Discord.Net.
 6. In Discord, try:
 
    ```text
-   /ping
+   /help
    ```
 
 ## Commands
+
+### `/help`
+
+Shows a private summary of FlowBot commands and group finder button behavior.
 
 ### `/role-message`
 
@@ -64,9 +68,9 @@ Creates a joinable group finder message for a game or activity. The creator is a
 Parameters:
 
 - `game-name`: required game or activity name.
-- `group-size`: optional total group size, including the creator. Supports 1-30. Leave it empty for an open-ended group.
-- `description`: optional message describing what you want to play.
-- `role-to-ping`: optional server role to ping in the initial bot message.
+- `group-size`: optional max players, including the creator. Supports 1-30. Leave it empty if anyone can join.
+- `description`: optional short note about what you want to do.
+- `role-to-ping`: optional role to notify when the group is posted.
 - `time`: optional start time. Supports `20:00`, `17.00`, `today 20:00`, `tomorrow 20:00`, and `2026-04-28 20:00`.
 
 Example:
@@ -79,7 +83,7 @@ When `time` is provided, FlowBot renders it as a Discord timestamp like `<t:...:
 
 The message updates as users click `Join group` or `Leave group`. When a fixed-size group fills for the first time, FlowBot sends the group creator a DM with a link back to the group message. The host or users with `Manage Messages`/`Administrator` can click `Close group`, then confirm, to remove the message. The current player list, host, start time, capacity notice state, and session started state are stored in the Discord message/embed/components, so existing group finder messages continue to work after FlowBot restarts.
 
-The group creator can also click `Start session`, then confirm, to manually ping every registered player. This is useful for open-ended groups or fixed-size groups that are ready to begin before reaching capacity. FlowBot only pings registered players when the creator starts the session.
+The group creator can also click `Start`, then confirm, to manually ping every registered player. This is useful for open-ended groups or fixed-size groups that are ready to begin before reaching capacity. FlowBot only pings registered players when the creator starts the session.
 
 ## Configuration
 

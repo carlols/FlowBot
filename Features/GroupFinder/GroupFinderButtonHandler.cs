@@ -76,10 +76,12 @@ public sealed class GroupFinderButtonHandler(
                 updatedSession = updatedSession with { CapacityNoticeSent = true };
                 await UpdateGroupMessageAsync(component, updatedSession);
                 await notificationService.SendCapacityNoticeAsync(component, updatedSession);
+                await component.FollowupAsync("You joined the group.", ephemeral: true);
                 return;
             }
 
             await UpdateGroupMessageAsync(component, updatedSession);
+            await component.FollowupAsync("You joined the group.", ephemeral: true);
             return;
         }
 
@@ -91,6 +93,7 @@ public sealed class GroupFinderButtonHandler(
 
         playerIds.Remove(userId);
         await UpdateGroupMessageAsync(component, session with { PlayerIds = playerIds });
+        await component.FollowupAsync("You left the group.", ephemeral: true);
     }
 
     private async Task StartSessionAsync(SocketMessageComponent component, GroupFinderSession session)
@@ -124,7 +127,7 @@ public sealed class GroupFinderButtonHandler(
             .Build();
 
         await component.RespondAsync(
-            "Starting this session will ping every registered player.",
+            "This will mention all registered players in this channel.",
             components: components,
             ephemeral: true);
     }

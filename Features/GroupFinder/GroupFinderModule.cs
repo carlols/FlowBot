@@ -6,14 +6,14 @@ namespace FlowBot;
 
 public sealed class GroupFinderModule(GroupFinderTimeParser timeParser) : InteractionModuleBase<SocketInteractionContext>
 {
-    [SlashCommand("group-finder", "Creates a joinable group finder message.")]
+    [SlashCommand("group-finder", "Create a group that people can join with buttons.")]
     [RequireContext(ContextType.Guild)]
     public async Task CreateGroupFinderAsync(
-        [Summary("game-name", "The game or activity you want to play.")] string gameName,
-        [Summary("group-size", "Optional total group size, including you. Leave empty for an open-ended group.")] [MinValue(GroupFinderSession.MinCapacity)] [MaxValue(GroupFinderSession.MaxCapacity)] int? groupSize = null,
-        [Summary("description", "Optional details about what you want to play.")] string? description = null,
-        [Summary("role-to-ping", "Optional server role to ping when posting the message.")] SocketRole? roleToPing = null,
-        [Summary("time", "Optional start time, such as 20:00, 17.00, tomorrow 20:00, or 2026-04-28 20:00.")] string? time = null)
+        [Summary("game-name", "Game or activity name shown at the top of the group message.")] string gameName,
+        [Summary("group-size", "Max players, including you. Leave empty if anyone can join.")] [MinValue(GroupFinderSession.MinCapacity)] [MaxValue(GroupFinderSession.MaxCapacity)] int? groupSize = null,
+        [Summary("description", "Short note about what you want to do.")] string? description = null,
+        [Summary("role-to-ping", "Role to notify when the group is posted.")] SocketRole? roleToPing = null,
+        [Summary("time", "Start time, like 20:00, 17.00, tomorrow 20:00, or 2026-04-28 20:00.")] string? time = null)
     {
         if (!timeParser.TryParse(time, out var startsAtUnixTimeSeconds, out var errorMessage))
         {
