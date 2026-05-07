@@ -19,6 +19,9 @@ public sealed class HelpModule : InteractionModuleBase<SocketInteractionContext>
                 "Group buttons",
                 "`Join` and `Leave` update the player list. The group creator can use `Start` to mention everyone registered, or `Close` to remove the group.")
             .AddField(
+                "/guess-pull-count",
+                "Admins can start a World of Warcraft boss pull-count guessing board. Members use the buttons to add, update, or remove their guesses.")
+            .AddField(
                 "/role-message",
                 "Admins can create a message that lets members add or remove a server role from themselves.")
             .AddField(

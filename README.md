@@ -61,6 +61,26 @@ Example:
 /role-message role:@Raider message:Click below to get raid notifications.
 ```
 
+### `/guess-pull-count`
+
+Creates a boss pull-count guessing board. Server members can add, update, or remove their own guesses with buttons. Guesses are sorted from highest to lowest and split across fields in groups of 10.
+
+Required permissions:
+
+- The user running the command needs `Administrator`.
+
+Parameters:
+
+- `boss-name`: required boss name shown on the guessing board.
+
+Example:
+
+```text
+/guess-pull-count boss-name:Mythic Dimensius
+```
+
+Admins can click `End Guessing`, then confirm, to close the board and disable its buttons. FlowBot stores the board state in the Discord message/embed/components, so active boards continue to work after FlowBot restarts.
+
 ### `/group-finder`
 
 Creates a joinable group finder message for a game or activity. The creator is automatically added as the first player.
