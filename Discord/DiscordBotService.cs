@@ -31,7 +31,8 @@ public sealed class DiscordBotService(
 
         client.Log += LogDiscordMessageAsync;
         interactions.Log += LogDiscordMessageAsync;
-        client.Ready += RegisterCommandsAsync;
+        client.Ready += HandleReadyAsync;
+        client.JoinedGuild += HandleJoinedGuildAsync;
         client.InteractionCreated += HandleInteractionAsync;
 
         await interactions.AddModulesAsync(Assembly.GetExecutingAssembly(), services);
@@ -51,13 +52,26 @@ public sealed class DiscordBotService(
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         client.InteractionCreated -= HandleInteractionAsync;
-        client.Ready -= RegisterCommandsAsync;
+        client.JoinedGuild -= HandleJoinedGuildAsync;
+        client.Ready -= HandleReadyAsync;
         interactions.Log -= LogDiscordMessageAsync;
         client.Log -= LogDiscordMessageAsync;
 
         await client.StopAsync();
         await client.LogoutAsync();
         await base.StopAsync(cancellationToken);
+    }
+
+    private async Task HandleReadyAsync()
+    {
+        if (!ValidateServerConfiguration())
+        {
+            lifetime.StopApplication();
+            return;
+        }
+
+        await LeaveDisallowedGuildsAsync();
+        await RegisterCommandsAsync();
     }
 
     private async Task RegisterCommandsAsync()
@@ -67,7 +81,20 @@ public sealed class DiscordBotService(
             return;
         }
 
-        if (_options.ServerId is { } serverId)
+        if (_options.AllowedServerIds.Length > 0)
+        {
+            var currentAllowedServerIds = client.Guilds
+                .Where(guild => IsGuildAllowed(guild.Id))
+                .Select(guild => guild.Id)
+                .Distinct()
+                .ToArray();
+
+            foreach (var allowedServerId in currentAllowedServerIds)
+            {
+                await RegisterCommandsToAllowedGuildAsync(allowedServerId);
+            }
+        }
+        else if (_options.ServerId is { } serverId)
         {
             await interactions.RegisterCommandsToGuildAsync(serverId);
             logger.LogInformation("Registered slash commands to server {ServerId}.", serverId);
@@ -80,6 +107,59 @@ public sealed class DiscordBotService(
 
         _commandsRegistered = true;
         logger.LogInformation("FlowBot is connected as {Username}.", client.CurrentUser);
+    }
+
+    private async Task HandleJoinedGuildAsync(SocketGuild guild)
+    {
+        if (IsGuildAllowed(guild.Id))
+        {
+            logger.LogInformation("FlowBot joined allowed server {GuildName} ({GuildId}).", guild.Name, guild.Id);
+            await RegisterCommandsToAllowedGuildAsync(guild.Id);
+            return;
+        }
+
+        logger.LogWarning(
+            "FlowBot was added to unallowed server {GuildName} ({GuildId}) and will leave.",
+            guild.Name,
+            guild.Id);
+        await guild.LeaveAsync();
+    }
+
+    private async Task LeaveDisallowedGuildsAsync()
+    {
+        foreach (var guild in client.Guilds.Where(guild => !IsGuildAllowed(guild.Id)).ToArray())
+        {
+            logger.LogWarning(
+                "FlowBot is in unallowed server {GuildName} ({GuildId}) and will leave.",
+                guild.Name,
+                guild.Id);
+            await guild.LeaveAsync();
+        }
+    }
+
+    private bool ValidateServerConfiguration()
+    {
+        if (_options.ServerId is not { } serverId
+            || _options.AllowedServerIds.Length == 0
+            || _options.AllowedServerIds.Contains(serverId))
+        {
+            return true;
+        }
+
+        logger.LogCritical(
+            "FlowBot:ServerId {ServerId} must also be included in FlowBot:AllowedServerIds when the allowlist is configured.",
+            serverId);
+        return false;
+    }
+
+    private bool IsGuildAllowed(ulong guildId) =>
+        _options.AllowedServerIds.Length == 0
+        || _options.AllowedServerIds.Contains(guildId);
+
+    private async Task RegisterCommandsToAllowedGuildAsync(ulong guildId)
+    {
+        await interactions.RegisterCommandsToGuildAsync(guildId);
+        logger.LogInformation("Registered slash commands to allowed server {ServerId}.", guildId);
     }
 
     private async Task HandleInteractionAsync(SocketInteraction interaction)

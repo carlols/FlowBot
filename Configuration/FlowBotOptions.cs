@@ -8,5 +8,7 @@ public sealed class FlowBotOptions
 
     public ulong? ServerId { get; init; }
 
+    public ulong[] AllowedServerIds { get; init; } = [];
+
     public string TimeZone { get; init; } = "Europe/Stockholm";
 }

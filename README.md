@@ -110,14 +110,34 @@ The group creator can also click `Start`, then confirm, to manually ping every r
 Configuration keys:
 
 - `FlowBot:Token`: Discord bot token. Keep this in user secrets or environment variables.
-- `FlowBot:ServerId`: Optional Discord server ID for fast server-scoped slash command registration.
+- `FlowBot:ServerId`: Optional Discord server ID for fast server-scoped slash command registration when FlowBot is only used in one server.
+- `FlowBot:AllowedServerIds`: Optional Discord server ID allowlist. When this list is empty, FlowBot can stay in any server it is invited to. When one or more IDs are configured, FlowBot registers slash commands to those servers and leaves any server that is not on the list.
 - `FlowBot:TimeZone`: Timezone used for group finder times such as `20:00`. Defaults to `Europe/Stockholm`.
+
+For a single private server, set both values to your server ID:
+
+```powershell
+dotnet user-secrets set "FlowBot:ServerId" "your-discord-server-id"
+dotnet user-secrets set "FlowBot:AllowedServerIds:0" "your-discord-server-id"
+```
+
+For multiple approved servers, set each allowed server by index. In that setup, `ServerId` is optional because FlowBot registers commands to every allowed server:
+
+```powershell
+dotnet user-secrets set "FlowBot:AllowedServerIds:0" "your-discord-server-id"
+dotnet user-secrets set "FlowBot:AllowedServerIds:1" "friend-server-id"
+dotnet user-secrets set "FlowBot:AllowedServerIds:2" "another-friend-server-id"
+```
+
+To remove a server from FlowBot access, remove that ID from `AllowedServerIds` and restart or redeploy FlowBot. On startup, FlowBot leaves any server that is no longer allowed. If someone invites FlowBot to an unallowed server while it is running, FlowBot leaves automatically.
 
 Environment variable equivalents use double underscores:
 
 ```powershell
 $env:FlowBot__Token = "your-bot-token"
 $env:FlowBot__ServerId = "your-discord-server-id"
+$env:FlowBot__AllowedServerIds__0 = "your-discord-server-id"
+$env:FlowBot__AllowedServerIds__1 = "friend-server-id"
 $env:FlowBot__TimeZone = "Europe/Stockholm"
 dotnet run
 ```
@@ -146,6 +166,8 @@ Set secrets:
 ```powershell
 fly secrets set FlowBot__Token="your-bot-token"
 fly secrets set FlowBot__ServerId="your-discord-server-id"
+fly secrets set FlowBot__AllowedServerIds__0="your-discord-server-id"
+fly secrets set FlowBot__AllowedServerIds__1="friend-server-id"
 fly secrets set FlowBot__TimeZone="Europe/Stockholm"
 ```
 
