@@ -50,4 +50,45 @@ public sealed class GroupFinderNotificationService(
             text: $"**{session.GameName}** is starting. Time to group up!{Environment.NewLine}{playerMentions}",
             allowedMentions: new AllowedMentions { UserIds = session.PlayerIds.ToList() });
     }
+
+    public async Task SendReadyCheckAsync(
+        IMessageChannel channel,
+        GroupFinderSession session,
+        ulong groupMessageId,
+        string? message)
+    {
+        var playerMentions = string.Join(" ", session.PlayerIds.Select(playerId => $"<@{playerId}>"));
+        var text = $"**{session.GameName}** ready check";
+
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            text += $"{Environment.NewLine}{message.Trim()}";
+        }
+
+        text += $"{Environment.NewLine}{Environment.NewLine}{playerMentions}";
+
+        var components = new ComponentBuilder()
+            .WithButton(
+                label: "Ready",
+                customId: GroupFinderButtonIds.CreateReadyId(
+                    groupMessageId,
+                    session.Capacity,
+                    session.CapacityNoticeSent,
+                    session.SessionStarted),
+                style: ButtonStyle.Success)
+            .WithButton(
+                label: "Not Ready",
+                customId: GroupFinderButtonIds.CreateNotReadyId(
+                    groupMessageId,
+                    session.Capacity,
+                    session.CapacityNoticeSent,
+                    session.SessionStarted),
+                style: ButtonStyle.Danger)
+            .Build();
+
+        await channel.SendMessageAsync(
+            text: text,
+            components: components,
+            allowedMentions: new AllowedMentions { UserIds = session.PlayerIds.ToList() });
+    }
 }

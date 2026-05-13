@@ -105,6 +105,8 @@ The message updates as users click `Join group` or `Leave group`. When a fixed-s
 
 The group creator can also click `Start`, then confirm, to manually ping every registered player. This is useful for open-ended groups or fixed-size groups that are ready to begin before reaching capacity. FlowBot only pings registered players when the creator starts the session.
 
+The group creator can click `Ready Check` to send one active ready check to registered players. FlowBot opens a short optional message form, posts a follow-up message mentioning the registered players, and lets them respond with `Ready` or `Not Ready`. The original group message updates each player row with `waiting`, `ready`, or `not ready`. Starting the session clears the active ready check.
+
 ## Configuration
 
 Configuration keys:

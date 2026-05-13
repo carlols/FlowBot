@@ -178,6 +178,13 @@ public sealed class DiscordBotService(
             return;
         }
 
+        if (interaction is SocketModal groupFinderModal
+            && GroupFinderButtonIds.IsGroupFinderButton(groupFinderModal.Data.CustomId))
+        {
+            await groupFinderButtonHandler.HandleReadyCheckModalAsync(groupFinderModal);
+            return;
+        }
+
         if (interaction is SocketMessageComponent pullCountComponent
             && PullCountGuessIds.IsPullCountGuessInteraction(pullCountComponent.Data.CustomId))
         {

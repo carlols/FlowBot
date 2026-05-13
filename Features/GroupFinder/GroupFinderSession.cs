@@ -10,12 +10,15 @@ public sealed record GroupFinderSession(
     long? StartsAtUnixTimeSeconds,
     bool CapacityNoticeSent,
     bool SessionStarted,
-    IReadOnlyList<ulong> PlayerIds)
+    IReadOnlyList<ulong> PlayerIds,
+    IReadOnlyDictionary<ulong, GroupFinderReadyState> ReadyStates)
 {
     public const int MinCapacity = 1;
     public const int MaxCapacity = 30;
 
     public bool IsFull => Capacity is { } capacity && PlayerIds.Count >= capacity;
+
+    public bool HasActiveReadyCheck => ReadyStates.Count > 0;
 
     public static GroupFinderSession Create(
         string gameName,
@@ -32,6 +35,7 @@ public sealed record GroupFinderSession(
             startsAtUnixTimeSeconds,
             false,
             false,
-            [creator.Id]);
+            [creator.Id],
+            new Dictionary<ulong, GroupFinderReadyState>());
     }
 }
