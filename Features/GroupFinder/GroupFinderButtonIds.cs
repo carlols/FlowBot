@@ -4,6 +4,10 @@ public static class GroupFinderButtonIds
 {
     private const string JoinPrefix = "flowbot-group-join:";
     private const string LeavePrefix = "flowbot-group-leave:";
+    private const string ReadyCheckPrefix = "flowbot-group-ready-check:";
+    private const string ReadyCheckModalPrefix = "flowbot-group-ready-modal:";
+    private const string ReadyPrefix = "flowbot-group-ready:";
+    private const string NotReadyPrefix = "flowbot-group-not-ready:";
     private const string StartPrefix = "flowbot-group-start:";
     private const string ConfirmStartPrefix = "flowbot-group-confirm-start:";
     private const string CancelStartPrefix = "flowbot-group-cancel-start:";
@@ -17,6 +21,30 @@ public static class GroupFinderButtonIds
 
     public static string CreateLeaveId(int? capacity, bool capacityNoticeSent, bool sessionStarted) =>
         $"{LeavePrefix}{FormatCapacity(capacity)}:{FormatState(capacityNoticeSent)}:{FormatState(sessionStarted)}";
+
+    public static string CreateReadyCheckId(int? capacity, bool capacityNoticeSent, bool sessionStarted) =>
+        $"{ReadyCheckPrefix}{FormatCapacity(capacity)}:{FormatState(capacityNoticeSent)}:{FormatState(sessionStarted)}";
+
+    public static string CreateReadyCheckModalId(
+        ulong messageId,
+        int? capacity,
+        bool capacityNoticeSent,
+        bool sessionStarted) =>
+        $"{ReadyCheckModalPrefix}{messageId}:{FormatCapacity(capacity)}:{FormatState(capacityNoticeSent)}:{FormatState(sessionStarted)}";
+
+    public static string CreateReadyId(
+        ulong messageId,
+        int? capacity,
+        bool capacityNoticeSent,
+        bool sessionStarted) =>
+        $"{ReadyPrefix}{messageId}:{FormatCapacity(capacity)}:{FormatState(capacityNoticeSent)}:{FormatState(sessionStarted)}";
+
+    public static string CreateNotReadyId(
+        ulong messageId,
+        int? capacity,
+        bool capacityNoticeSent,
+        bool sessionStarted) =>
+        $"{NotReadyPrefix}{messageId}:{FormatCapacity(capacity)}:{FormatState(capacityNoticeSent)}:{FormatState(sessionStarted)}";
 
     public static string CreateStartId(int? capacity, bool capacityNoticeSent, bool sessionStarted) =>
         $"{StartPrefix}{FormatCapacity(capacity)}:{FormatState(capacityNoticeSent)}:{FormatState(sessionStarted)}";
@@ -42,6 +70,10 @@ public static class GroupFinderButtonIds
     public static bool IsGroupFinderButton(string customId) =>
         customId.StartsWith(JoinPrefix, StringComparison.Ordinal)
         || customId.StartsWith(LeavePrefix, StringComparison.Ordinal)
+        || customId.StartsWith(ReadyCheckPrefix, StringComparison.Ordinal)
+        || customId.StartsWith(ReadyCheckModalPrefix, StringComparison.Ordinal)
+        || customId.StartsWith(ReadyPrefix, StringComparison.Ordinal)
+        || customId.StartsWith(NotReadyPrefix, StringComparison.Ordinal)
         || customId.StartsWith(StartPrefix, StringComparison.Ordinal)
         || customId.StartsWith(ConfirmStartPrefix, StringComparison.Ordinal)
         || customId.StartsWith(CancelStartPrefix, StringComparison.Ordinal)
@@ -61,12 +93,49 @@ public static class GroupFinderButtonIds
             return true;
         }
 
+        if (TryParse(customId, ReadyCheckPrefix, GroupFinderButtonAction.ReadyCheck, out state))
+        {
+            return true;
+        }
+
         if (TryParse(customId, StartPrefix, GroupFinderButtonAction.Start, out state))
         {
             return true;
         }
 
         return TryParse(customId, ClosePrefix, GroupFinderButtonAction.Close, out state);
+    }
+
+    public static bool TryParseReadyCheckModal(string customId, out GroupFinderReadyCheckModalState state)
+    {
+        state = new GroupFinderReadyCheckModalState(0, null, null, null);
+
+        if (!customId.StartsWith(ReadyCheckModalPrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var values = customId[ReadyCheckModalPrefix.Length..].Split(':', StringSplitOptions.RemoveEmptyEntries);
+
+        if (values.Length != 4
+            || !ulong.TryParse(values[0], out var messageId)
+            || !TryParseCapacity(values[1], out var capacity))
+        {
+            return false;
+        }
+
+        state = new GroupFinderReadyCheckModalState(messageId, capacity, values[2] == "1", values[3] == "1");
+        return true;
+    }
+
+    public static bool TryParseReadyResponse(string customId, out GroupFinderReadyResponseState state)
+    {
+        if (TryParseReadyResponse(customId, ReadyPrefix, GroupFinderButtonAction.Ready, out state))
+        {
+            return true;
+        }
+
+        return TryParseReadyResponse(customId, NotReadyPrefix, GroupFinderButtonAction.NotReady, out state);
     }
 
     public static bool TryParseStartConfirmation(string customId, out GroupFinderStartConfirmation confirmation)
@@ -214,4 +283,30 @@ public static class GroupFinderButtonIds
 
     private static string FormatState(bool value) =>
         value ? "1" : "0";
+
+    private static bool TryParseReadyResponse(
+        string customId,
+        string prefix,
+        GroupFinderButtonAction action,
+        out GroupFinderReadyResponseState state)
+    {
+        state = new GroupFinderReadyResponseState(action, 0, null, null, null);
+
+        if (!customId.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var values = customId[prefix.Length..].Split(':', StringSplitOptions.RemoveEmptyEntries);
+
+        if (values.Length != 4
+            || !ulong.TryParse(values[0], out var messageId)
+            || !TryParseCapacity(values[1], out var capacity))
+        {
+            return false;
+        }
+
+        state = new GroupFinderReadyResponseState(action, messageId, capacity, values[2] == "1", values[3] == "1");
+        return true;
+    }
 }
