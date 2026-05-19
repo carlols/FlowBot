@@ -193,6 +193,13 @@ public sealed class DiscordBotService(
             return;
         }
 
+        if (interaction is SocketMessageComponent emojiImportComponent
+            && EmojiImportIds.IsEmojiImportInteraction(emojiImportComponent.Data.CustomId))
+        {
+            await emojiImportHandler.HandleComponentAsync(emojiImportComponent);
+            return;
+        }
+
         if (interaction is SocketModal pullCountModal
             && PullCountGuessIds.IsPullCountGuessInteraction(pullCountModal.Data.CustomId))
         {

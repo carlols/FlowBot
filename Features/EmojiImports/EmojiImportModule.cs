@@ -30,27 +30,22 @@ public sealed class EmojiImportModule : InteractionModuleBase<SocketInteractionC
 
         if (emojis.Count > 1)
         {
+            if (emojis.Count > EmojiImportMessageBuilder.MaxSelectableEmojis)
+            {
+                await RespondAsync(
+                    $"I found {emojis.Count} custom emojis in that message, but Discord select menus can only show {EmojiImportMessageBuilder.MaxSelectableEmojis} options. Try a message with fewer custom emojis for now.",
+                    ephemeral: true);
+                return;
+            }
+
             await RespondAsync(
-                "I found more than one custom emoji in that message. For now, import from a message with exactly one custom emoji.",
+                "Which emoji do you want to import?",
+                components: EmojiImportMessageBuilder.CreateSelectionComponents(emojis),
                 ephemeral: true);
             return;
         }
 
         var emoji = emojis[0];
-        var modal = new ModalBuilder()
-            .WithTitle("Import emoji")
-            .WithCustomId(EmojiImportIds.CreateModalId(emoji))
-            .AddTextInput(
-                label: "Emoji name",
-                customId: EmojiImportIds.EmojiNameInputId,
-                style: TextInputStyle.Short,
-                placeholder: "letters, numbers, and underscores only",
-                minLength: 2,
-                maxLength: 32,
-                required: true,
-                value: emoji.Name)
-            .Build();
-
-        await RespondWithModalAsync(modal);
+        await RespondWithModalAsync(EmojiImportMessageBuilder.CreateNameModal(emoji));
     }
 }

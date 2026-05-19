@@ -84,7 +84,7 @@ Admins can click `End Guessing`, then confirm, to close the board and disable it
 
 ### `Import Emoji`
 
-Right-click a Discord message, choose `Apps`, then choose `Import Emoji`. FlowBot supports messages with exactly one custom emoji for now. It opens a private name form before importing, so the server owner can choose the emoji name used in the current server.
+Right-click a Discord message, choose `Apps`, then choose `Import Emoji`. If the message has one custom emoji, FlowBot opens a private name form before importing. If the message has multiple custom emojis, FlowBot first shows a private dropdown so the server owner can choose which emoji to import, then opens the name form. Discord select menus support up to 25 options, so messages with more than 25 custom emojis are rejected for now.
 
 Required permissions:
 

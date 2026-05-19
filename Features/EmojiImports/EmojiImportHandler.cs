@@ -5,6 +5,37 @@ namespace FlowBot;
 
 public sealed class EmojiImportHandler(HttpClient httpClient, ILogger<EmojiImportHandler> logger)
 {
+    public async Task HandleComponentAsync(SocketMessageComponent component)
+    {
+        if (component.Data.CustomId != EmojiImportIds.EmojiSelectId)
+        {
+            await component.RespondAsync("I could not understand that emoji import selection.", ephemeral: true);
+            return;
+        }
+
+        var guild = GetGuild(component);
+        if (guild is null)
+        {
+            await component.RespondAsync("Emoji imports can only be completed inside a server.", ephemeral: true);
+            return;
+        }
+
+        if (component.User.Id != guild.OwnerId)
+        {
+            await component.RespondAsync("Only the server owner can import emojis with FlowBot.", ephemeral: true);
+            return;
+        }
+
+        var selectedValue = component.Data.Values.FirstOrDefault();
+        if (selectedValue is null || !EmojiImportIds.TryParseSelectValue(selectedValue, out var emoji))
+        {
+            await component.RespondAsync("I could not understand that emoji selection.", ephemeral: true);
+            return;
+        }
+
+        await component.RespondWithModalAsync(EmojiImportMessageBuilder.CreateNameModal(emoji));
+    }
+
     public async Task HandleModalAsync(SocketModal modal)
     {
         if (!EmojiImportIds.TryParseModal(modal.Data.CustomId, out var state))
@@ -80,4 +111,8 @@ public sealed class EmojiImportHandler(HttpClient httpClient, ILogger<EmojiImpor
     private static SocketGuild? GetGuild(SocketModal modal) =>
         (modal.User as SocketGuildUser)?.Guild
         ?? (modal.Channel as SocketGuildChannel)?.Guild;
+
+    private static SocketGuild? GetGuild(SocketMessageComponent component) =>
+        (component.User as SocketGuildUser)?.Guild
+        ?? (component.Channel as SocketGuildChannel)?.Guild;
 }
