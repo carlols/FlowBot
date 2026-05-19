@@ -23,7 +23,7 @@ public sealed class HelpModule : InteractionModuleBase<SocketInteractionContext>
                 "Admins can start a World of Warcraft boss pull-count guessing board. Members use the buttons to add, update, or remove their guesses.")
             .AddField(
                 "Import Emoji",
-                "Server owners can right-click a message with one custom emoji and use `Apps > Import Emoji` to add it to the server.")
+                "Server owners can right-click a message with custom emojis and use `Apps > Import Emoji` to choose one, rename it, and add it to the server.")
             .AddField(
                 "/role-message",
                 "Admins can create a message that lets members add or remove a server role from themselves.")
