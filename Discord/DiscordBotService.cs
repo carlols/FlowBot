@@ -12,6 +12,7 @@ public sealed class DiscordBotService(
     RoleButtonHandler roleButtonHandler,
     GroupFinderButtonHandler groupFinderButtonHandler,
     PullCountGuessHandler pullCountGuessHandler,
+    EmojiImportHandler emojiImportHandler,
     IServiceProvider services,
     IOptions<FlowBotOptions> options,
     IHostApplicationLifetime lifetime,
@@ -196,6 +197,13 @@ public sealed class DiscordBotService(
             && PullCountGuessIds.IsPullCountGuessInteraction(pullCountModal.Data.CustomId))
         {
             await pullCountGuessHandler.HandleModalAsync(pullCountModal);
+            return;
+        }
+
+        if (interaction is SocketModal emojiImportModal
+            && EmojiImportIds.IsEmojiImportInteraction(emojiImportModal.Data.CustomId))
+        {
+            await emojiImportHandler.HandleModalAsync(emojiImportModal);
             return;
         }
 

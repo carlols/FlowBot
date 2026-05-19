@@ -8,6 +8,7 @@ FlowBot is a private Discord bot built with .NET 9 and Discord.Net.
 - `Configuration/`: strongly typed configuration objects.
 - `Discord/`: Discord client hosting, connection, and event routing.
 - `Features/`: larger feature areas grouped by domain.
+- `Features/EmojiImports/`: right-click message command for importing custom emojis.
 - `Features/GroupFinder/`: joinable group finder messages for game sessions.
 - `Features/RoleMessages/`: self-assignable role message command and button handling.
 
@@ -80,6 +81,15 @@ Example:
 ```
 
 Admins can click `End Guessing`, then confirm, to close the board and disable its buttons. FlowBot stores the board state in the Discord message/embed/components, so active boards continue to work after FlowBot restarts.
+
+### `Import Emoji`
+
+Right-click a Discord message, choose `Apps`, then choose `Import Emoji`. FlowBot supports messages with exactly one custom emoji for now. It opens a private name form before importing, so the server owner can choose the emoji name used in the current server.
+
+Required permissions:
+
+- The user running the command must be the server owner.
+- FlowBot needs `Manage Emojis and Stickers`.
 
 ### `/group-finder`
 
