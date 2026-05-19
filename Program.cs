@@ -31,6 +31,8 @@ builder.Services.AddSingleton<GroupFinderButtonHandler>();
 builder.Services.AddSingleton<GroupFinderNotificationService>();
 builder.Services.AddSingleton<GroupFinderTimeParser>();
 builder.Services.AddSingleton<PullCountGuessHandler>();
+builder.Services.AddSingleton<HttpClient>();
+builder.Services.AddSingleton<EmojiImportHandler>();
 builder.Services.AddHostedService<DiscordBotService>();
 
 var host = builder.Build();
