@@ -14,9 +14,9 @@ public sealed class EmojiImportModule : InteractionModuleBase<SocketInteractionC
             return;
         }
 
-        if (Context.User.Id != Context.Guild.OwnerId)
+        if (!EmojiImportPermissions.CanImportEmojis(Context.Guild, Context.User))
         {
-            await RespondAsync("Only the server owner can import emojis with FlowBot.", ephemeral: true);
+            await RespondAsync(EmojiImportPermissions.DeniedMessage, ephemeral: true);
             return;
         }
 
