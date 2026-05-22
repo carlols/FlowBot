@@ -88,7 +88,7 @@ Right-click a Discord message, choose `Apps`, then choose `Import Emoji`. If the
 
 Required permissions:
 
-- The user running the command must be the server owner.
+- The user running the command must be the server owner or have the `Big Lord` role.
 - FlowBot needs `Manage Emojis and Stickers`.
 
 ### `/group-finder`

@@ -20,9 +20,9 @@ public sealed class EmojiImportHandler(HttpClient httpClient, ILogger<EmojiImpor
             return;
         }
 
-        if (component.User.Id != guild.OwnerId)
+        if (!EmojiImportPermissions.CanImportEmojis(guild, component.User))
         {
-            await component.RespondAsync("Only the server owner can import emojis with FlowBot.", ephemeral: true);
+            await component.RespondAsync(EmojiImportPermissions.DeniedMessage, ephemeral: true);
             return;
         }
 
@@ -51,9 +51,9 @@ public sealed class EmojiImportHandler(HttpClient httpClient, ILogger<EmojiImpor
             return;
         }
 
-        if (modal.User.Id != guild.OwnerId)
+        if (!EmojiImportPermissions.CanImportEmojis(guild, modal.User))
         {
-            await modal.RespondAsync("Only the server owner can import emojis with FlowBot.", ephemeral: true);
+            await modal.RespondAsync(EmojiImportPermissions.DeniedMessage, ephemeral: true);
             return;
         }
 
