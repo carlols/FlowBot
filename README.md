@@ -98,14 +98,15 @@ Parameters:
 
 - `role-to-move`: required role whose currently connected members should be moved.
 - `target-channel`: required voice channel to move the role group into.
+- `main-channel`: optional voice channel to move the role group back into.
 
 Example:
 
 ```text
-/raid-voice-split role-to-move:@Boss Group 2 target-channel:Split Voice
+/raid-voice-split role-to-move:@Boss Group 2 target-channel:Split Voice main-channel:Raid Voice
 ```
 
-Admins can click `Move group` to move all currently connected, non-bot members with the selected role who are not already in the target voice channel. Admins can click `Close` to delete the control message.
+Admins can click `Move to split` to move all currently connected, non-bot members with the selected role who are not already in the split voice channel. When `main-channel` is provided, admins can click `Move back` to move those same role members back to the main voice channel. Admins can click `Close` to delete the control message.
 
 ### `Import Emoji`
 

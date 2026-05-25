@@ -4,8 +4,14 @@ public static class RaidVoiceSplitButtonIds
 {
     private const string Prefix = "flowbot-raid-voice:";
 
-    public static string CreateMoveGroupId(ulong roleId, ulong targetChannelId) =>
-        $"{Prefix}move:{roleId}:{targetChannelId}";
+    public static string CreateMoveGroupId(ulong roleId, ulong destinationChannelId) =>
+        CreateMoveId("split", roleId, destinationChannelId);
+
+    public static string CreateMoveBackId(ulong roleId, ulong destinationChannelId) =>
+        CreateMoveId("main", roleId, destinationChannelId);
+
+    private static string CreateMoveId(string direction, ulong roleId, ulong destinationChannelId) =>
+        $"{Prefix}move-{direction}:{roleId}:{destinationChannelId}";
 
     public static string CreateCloseId() =>
         $"{Prefix}close";
@@ -29,14 +35,14 @@ public static class RaidVoiceSplitButtonIds
         }
 
         if (values.Length != 3
-            || values[0] != "move"
+            || values[0] is not ("move" or "move-split" or "move-main")
             || !ulong.TryParse(values[1], out var roleId)
-            || !ulong.TryParse(values[2], out var targetChannelId))
+            || !ulong.TryParse(values[2], out var destinationChannelId))
         {
             return false;
         }
 
-        state = new RaidVoiceSplitButtonState(RaidVoiceSplitAction.MoveGroup, roleId, targetChannelId);
+        state = new RaidVoiceSplitButtonState(RaidVoiceSplitAction.MoveGroup, roleId, destinationChannelId);
         return true;
     }
 }
