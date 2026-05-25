@@ -10,6 +10,7 @@ FlowBot is a private Discord bot built with .NET 9 and Discord.Net.
 - `Features/`: larger feature areas grouped by domain.
 - `Features/EmojiImports/`: right-click message command for importing custom emojis.
 - `Features/GroupFinder/`: joinable group finder messages for game sessions.
+- `Features/RaidVoiceSplits/`: admin controls for moving a role-based raid split into a voice channel.
 - `Features/RoleMessages/`: self-assignable role message command and button handling.
 
 ## Local Setup
@@ -81,6 +82,30 @@ Example:
 ```
 
 Admins can click `End Guessing`, then confirm, to close the board and disable its buttons. FlowBot stores the board state in the Discord message/embed/components, so active boards continue to work after FlowBot restarts.
+
+### `/raid-voice-split`
+
+Creates an admin-only control message for moving connected members with a selected role into a selected voice channel. This is useful for raid encounters where a predictable split group needs to move voice channels at a specific moment.
+
+Required permissions:
+
+- The user running the command needs `Administrator`.
+- FlowBot needs `Move Members`.
+- FlowBot needs `Connect` in the target voice channel.
+- FlowBot must be able to see the relevant voice channels.
+
+Parameters:
+
+- `role-to-move`: required role whose currently connected members should be moved.
+- `target-channel`: required voice channel to move the role group into.
+
+Example:
+
+```text
+/raid-voice-split role-to-move:@Boss Group 2 target-channel:Split Voice
+```
+
+Admins can click `Move group` to move all currently connected, non-bot members with the selected role who are not already in the target voice channel. Admins can click `Close` to delete the control message.
 
 ### `Import Emoji`
 
