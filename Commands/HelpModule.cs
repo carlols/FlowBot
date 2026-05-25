@@ -22,6 +22,9 @@ public sealed class HelpModule : InteractionModuleBase<SocketInteractionContext>
                 "/guess-pull-count",
                 "Admins can start a World of Warcraft boss pull-count guessing board. Members use the buttons to add, update, or remove their guesses.")
             .AddField(
+                "/raid-voice-split",
+                "Admins can create controls that move connected members with a selected raid-split role into a target voice channel.")
+            .AddField(
                 "Import Emoji",
                 "Server owners and members with `Big Lord` can right-click a message with custom emojis and use `Apps > Import Emoji` to choose one, rename it, and add it to the server.")
             .AddField(

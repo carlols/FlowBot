@@ -10,7 +10,7 @@ builder.Services.Configure<FlowBotOptions>(
 
 builder.Services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
 {
-    GatewayIntents = GatewayIntents.Guilds,
+    GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildVoiceStates,
     LogGatewayIntentWarnings = false,
 }));
 
@@ -33,6 +33,7 @@ builder.Services.AddSingleton<GroupFinderTimeParser>();
 builder.Services.AddSingleton<PullCountGuessHandler>();
 builder.Services.AddSingleton<HttpClient>();
 builder.Services.AddSingleton<EmojiImportHandler>();
+builder.Services.AddSingleton<RaidVoiceSplitHandler>();
 builder.Services.AddHostedService<DiscordBotService>();
 
 var host = builder.Build();

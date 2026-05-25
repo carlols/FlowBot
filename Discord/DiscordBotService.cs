@@ -13,6 +13,7 @@ public sealed class DiscordBotService(
     GroupFinderButtonHandler groupFinderButtonHandler,
     PullCountGuessHandler pullCountGuessHandler,
     EmojiImportHandler emojiImportHandler,
+    RaidVoiceSplitHandler raidVoiceSplitHandler,
     IServiceProvider services,
     IOptions<FlowBotOptions> options,
     IHostApplicationLifetime lifetime,
@@ -197,6 +198,13 @@ public sealed class DiscordBotService(
             && EmojiImportIds.IsEmojiImportInteraction(emojiImportComponent.Data.CustomId))
         {
             await emojiImportHandler.HandleComponentAsync(emojiImportComponent);
+            return;
+        }
+
+        if (interaction is SocketMessageComponent raidVoiceSplitComponent
+            && RaidVoiceSplitButtonIds.IsRaidVoiceSplitButton(raidVoiceSplitComponent.Data.CustomId))
+        {
+            await raidVoiceSplitHandler.HandleAsync(raidVoiceSplitComponent);
             return;
         }
 
