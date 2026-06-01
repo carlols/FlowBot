@@ -7,7 +7,7 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
     public const int DiscordEmojiSizeLimitBytes = 256 * 1024;
 
     private const int MaxOptimizableImageBytes = 2 * 1024 * 1024;
-    private const int MaxAnimatedFrameCount = 80;
+    private const int MaxAnimatedFrameCount = 120;
     private const ulong MaxAnimatedPixelsPerFrame = 512UL * 512UL;
     private static readonly SemaphoreSlim OptimizationLock = new(1, 1);
     private static readonly int?[] DimensionSteps = [null, 128, 112, 96, 80, 64];
@@ -74,8 +74,17 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
         }
     }
 
-    private static EmojiImageOptimizationResult? OptimizeAnimatedGif(byte[] imageBytes)
+    private EmojiImageOptimizationResult? OptimizeAnimatedGif(byte[] imageBytes)
     {
+        using (var images = new MagickImageCollection(imageBytes))
+        {
+            if (!IsAnimatedGifSafeToOptimize(images, out var reason))
+            {
+                logger.LogInformation("Skipping animated emoji optimization: {Reason}", reason);
+                return null;
+            }
+        }
+
         EmojiImageOptimizationResult? smallestResult = null;
 
         foreach (var step in AnimatedSteps)
@@ -120,8 +129,6 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
         int? colors)
     {
         using var images = new MagickImageCollection(imageBytes);
-
-        EnsureAnimatedGifIsSafeToOptimize(images);
 
         foreach (var image in images)
         {
@@ -207,12 +214,12 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
         return string.Join(", ", steps);
     }
 
-    private static void EnsureAnimatedGifIsSafeToOptimize(MagickImageCollection images)
+    private static bool IsAnimatedGifSafeToOptimize(MagickImageCollection images, out string reason)
     {
         if (images.Count > MaxAnimatedFrameCount)
         {
-            throw new InvalidOperationException(
-                $"Animated emoji has {images.Count} frames, above the {MaxAnimatedFrameCount} frame optimization limit.");
+            reason = $"animated emoji has {images.Count} frames, above the {MaxAnimatedFrameCount} frame optimization limit.";
+            return false;
         }
 
         foreach (var image in images)
@@ -221,10 +228,13 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
 
             if (pixels > MaxAnimatedPixelsPerFrame)
             {
-                throw new InvalidOperationException(
-                    $"Animated emoji has a {image.Width}x{image.Height} frame, above the optimization pixel limit.");
+                reason = $"animated emoji has a {image.Width}x{image.Height} frame, above the optimization pixel limit.";
+                return false;
             }
         }
+
+        reason = string.Empty;
+        return true;
     }
 
     private sealed record AnimatedOptimizationStep(int? MaxDimension, int? Colors);
