@@ -103,7 +103,20 @@ public sealed class EmojiImportHandler(
         }
         catch (HttpException exception) when (ShouldTryOptimization(exception))
         {
-            await TryOptimizeAndImportAsync(modal, guild, state, emojiName);
+            if (state.IsAnimated)
+            {
+                logger.LogInformation(
+                    "Skipping optimization for animated emoji {EmojiId} in server {GuildId}.",
+                    state.EmojiId,
+                    guild.Id);
+
+                await modal.FollowupAsync(
+                    "Discord rejected that animated emoji because it could not resize the asset below 256 KB. FlowBot skips animated emoji optimization so the bot can stay online.",
+                    ephemeral: true);
+                return;
+            }
+
+            await TryOptimizeAndImportStaticImageAsync(modal, guild, state, emojiName);
         }
         catch (HttpException exception)
         {
@@ -128,7 +141,7 @@ public sealed class EmojiImportHandler(
         }
     }
 
-    private async Task TryOptimizeAndImportAsync(
+    private async Task TryOptimizeAndImportStaticImageAsync(
         SocketModal modal,
         SocketGuild guild,
         EmojiImportModalState state,
@@ -137,12 +150,12 @@ public sealed class EmojiImportHandler(
         try
         {
             var imageBytes = await httpClient.GetByteArrayAsync(state.CdnUrl);
-            var optimizationResult = imageOptimizer.Optimize(imageBytes, state.IsAnimated);
+            var optimizationResult = imageOptimizer.OptimizeStaticImage(imageBytes);
 
             if (optimizationResult is null)
             {
                 await modal.FollowupAsync(
-                    "Discord rejected that emoji because it could not resize the asset below 256 KB, and FlowBot could not lightly optimize it enough without heavier processing.",
+                    "Discord rejected that emoji because it could not resize the asset below 256 KB, and FlowBot could not lightly optimize it enough.",
                     ephemeral: true);
                 return;
             }
@@ -162,7 +175,7 @@ public sealed class EmojiImportHandler(
         {
             logger.LogWarning(exception, "Failed to optimize and import emoji {EmojiId} into server {GuildId}.", state.EmojiId, guild.Id);
             await modal.FollowupAsync(
-                "I could not import that emoji because optimization failed unexpectedly.",
+                "I could not import that emoji because image optimization failed unexpectedly.",
                 ephemeral: true);
         }
     }
@@ -185,7 +198,7 @@ public sealed class EmojiImportHandler(
     {
         if (exception.DiscordCode == DiscordErrorCode.FailedToResizeAssetBelowTheMaximumSize)
         {
-            return "Discord rejected that emoji because it could not resize the asset below 256 KB. This is most common with larger animated emojis.";
+            return "Discord rejected that emoji because it could not resize the asset below 256 KB.";
         }
 
         return string.IsNullOrWhiteSpace(exception.Reason)
