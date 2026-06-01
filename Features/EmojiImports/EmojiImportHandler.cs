@@ -5,7 +5,10 @@ using Discord.WebSocket;
 
 namespace FlowBot;
 
-public sealed class EmojiImportHandler(HttpClient httpClient, ILogger<EmojiImportHandler> logger)
+public sealed class EmojiImportHandler(
+    HttpClient httpClient,
+    EmojiImageOptimizer imageOptimizer,
+    ILogger<EmojiImportHandler> logger)
 {
     public async Task HandleComponentAsync(SocketMessageComponent component)
     {
@@ -94,12 +97,13 @@ public sealed class EmojiImportHandler(HttpClient httpClient, ILogger<EmojiImpor
         try
         {
             var imageBytes = await httpClient.GetByteArrayAsync(state.CdnUrl);
-            await using var imageStream = new MemoryStream(imageBytes);
-            using var image = new Image(imageStream);
-
-            var createdEmoji = await guild.CreateEmoteAsync(emojiName, image);
+            var createdEmoji = await CreateEmoteAsync(guild, emojiName, imageBytes);
 
             await modal.FollowupAsync($"Imported {createdEmoji} as `:{createdEmoji.Name}:`.", ephemeral: true);
+        }
+        catch (HttpException exception) when (ShouldTryOptimization(exception))
+        {
+            await TryOptimizeAndImportAsync(modal, guild, state, emojiName);
         }
         catch (HttpException exception)
         {
@@ -123,6 +127,59 @@ public sealed class EmojiImportHandler(HttpClient httpClient, ILogger<EmojiImpor
                 ephemeral: true);
         }
     }
+
+    private async Task TryOptimizeAndImportAsync(
+        SocketModal modal,
+        SocketGuild guild,
+        EmojiImportModalState state,
+        string emojiName)
+    {
+        try
+        {
+            var imageBytes = await httpClient.GetByteArrayAsync(state.CdnUrl);
+            var optimizationResult = imageOptimizer.Optimize(imageBytes, state.IsAnimated);
+
+            if (optimizationResult is null)
+            {
+                await modal.FollowupAsync(
+                    "Discord rejected that emoji because it could not resize the asset below 256 KB, and FlowBot could not lightly optimize it enough without heavier processing.",
+                    ephemeral: true);
+                return;
+            }
+
+            var createdEmoji = await CreateEmoteAsync(guild, emojiName, optimizationResult.ImageBytes);
+
+            await modal.FollowupAsync(
+                $"Imported {createdEmoji} as `:{createdEmoji.Name}:`. FlowBot lightly optimized it first: {optimizationResult.Description}.",
+                ephemeral: true);
+        }
+        catch (HttpException exception)
+        {
+            logger.LogWarning(exception, "Failed to import optimized emoji {EmojiId} into server {GuildId}.", state.EmojiId, guild.Id);
+            await modal.FollowupAsync(BuildDiscordUploadFailureMessage(exception), ephemeral: true);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Failed to optimize and import emoji {EmojiId} into server {GuildId}.", state.EmojiId, guild.Id);
+            await modal.FollowupAsync(
+                "I could not import that emoji because optimization failed unexpectedly.",
+                ephemeral: true);
+        }
+    }
+
+    private static async Task<GuildEmote> CreateEmoteAsync(
+        SocketGuild guild,
+        string emojiName,
+        byte[] imageBytes)
+    {
+        await using var imageStream = new MemoryStream(imageBytes);
+        using var image = new Image(imageStream);
+
+        return await guild.CreateEmoteAsync(emojiName, image);
+    }
+
+    private static bool ShouldTryOptimization(HttpException exception) =>
+        exception.DiscordCode == DiscordErrorCode.FailedToResizeAssetBelowTheMaximumSize;
 
     private static string BuildDiscordUploadFailureMessage(HttpException exception)
     {
