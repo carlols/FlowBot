@@ -112,7 +112,7 @@ Admins can click `Move to split` to move all currently connected, non-bot member
 
 Right-click a Discord message, choose `Apps`, then choose `Import Emoji`. If the message has one custom emoji, FlowBot opens a private name form before importing. If the message has multiple custom emojis, FlowBot first shows a private dropdown so the server owner can choose which emoji to import, then opens the name form. Discord select menus support up to 25 options, so messages with more than 25 custom emojis are rejected for now.
 
-If Discord rejects an emoji because it cannot resize the asset below 256 KB, FlowBot makes a conservative optimization attempt with Magick.NET and retries the upload. For animated emojis, FlowBot starts with frame/metadata optimization, then gradually tries smaller dimensions and reduced color palettes without dropping frames.
+If Discord rejects an emoji because it cannot resize the asset below 256 KB, FlowBot makes a conservative optimization attempt with Magick.NET and retries the upload. For animated emojis, FlowBot starts with frame/metadata optimization, then gradually tries smaller dimensions and reduced color palettes without dropping frames. Optimization is memory guarded so very large or complex animated emojis may be declined instead of risking a bot restart.
 
 Required permissions:
 

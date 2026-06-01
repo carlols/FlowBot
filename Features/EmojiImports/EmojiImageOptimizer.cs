@@ -6,11 +6,57 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
 {
     public const int DiscordEmojiSizeLimitBytes = 256 * 1024;
 
+    private const int MaxOptimizableImageBytes = 2 * 1024 * 1024;
+    private const int MaxAnimatedFrameCount = 80;
+    private const ulong MaxAnimatedPixelsPerFrame = 512UL * 512UL;
+    private static readonly SemaphoreSlim OptimizationLock = new(1, 1);
     private static readonly int?[] DimensionSteps = [null, 128, 112, 96, 80, 64];
-    private static readonly int?[] ColorSteps = [null, 224, 192, 160, 128, 96, 64];
+    private static readonly AnimatedOptimizationStep[] AnimatedSteps =
+    [
+        new(null, null),
+        new(128, null),
+        new(112, null),
+        new(96, null),
+        new(128, 224),
+        new(112, 224),
+        new(96, 224),
+        new(96, 192),
+        new(80, 192),
+        new(80, 160),
+        new(64, 160),
+        new(64, 128),
+        new(64, 96),
+        new(64, 64),
+    ];
+
+    static EmojiImageOptimizer()
+    {
+        // Keep native ImageMagick work inside the small memory envelope of the Fly machine.
+        MagickNET.SetEnvironmentVariable("MAGICK_THREAD_LIMIT", "1");
+        MagickNET.SetEnvironmentVariable("MAGICK_MEMORY_LIMIT", "64MiB");
+        MagickNET.SetEnvironmentVariable("MAGICK_MAP_LIMIT", "64MiB");
+        MagickNET.SetEnvironmentVariable("MAGICK_AREA_LIMIT", "16MP");
+        MagickNET.SetEnvironmentVariable("MAGICK_DISK_LIMIT", "128MiB");
+        MagickNET.SetTempDirectory(Path.GetTempPath());
+    }
 
     public EmojiImageOptimizationResult? Optimize(byte[] imageBytes, bool isAnimated)
     {
+        if (imageBytes.Length > MaxOptimizableImageBytes)
+        {
+            logger.LogInformation(
+                "Skipping emoji optimization because the source image is {ImageSize} bytes, above the {Limit} byte safety limit.",
+                imageBytes.Length,
+                MaxOptimizableImageBytes);
+            return null;
+        }
+
+        if (!OptimizationLock.Wait(TimeSpan.FromSeconds(2)))
+        {
+            logger.LogInformation("Skipping emoji optimization because another optimization is already running.");
+            return null;
+        }
+
         try
         {
             return isAnimated
@@ -22,28 +68,24 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
             logger.LogWarning(exception, "Failed to optimize emoji image.");
             return null;
         }
+        finally
+        {
+            OptimizationLock.Release();
+        }
     }
 
     private static EmojiImageOptimizationResult? OptimizeAnimatedGif(byte[] imageBytes)
     {
         EmojiImageOptimizationResult? smallestResult = null;
 
-        foreach (var maxDimension in DimensionSteps)
+        foreach (var step in AnimatedSteps)
         {
-            foreach (var colors in ColorSteps)
+            var result = CreateAnimatedGifCandidate(imageBytes, step.MaxDimension, step.Colors);
+            smallestResult = GetSmallerResult(smallestResult, result);
+
+            if (result.ImageBytes.Length <= DiscordEmojiSizeLimitBytes)
             {
-                if (maxDimension is null && colors is not null)
-                {
-                    continue;
-                }
-
-                var result = CreateAnimatedGifCandidate(imageBytes, maxDimension, colors);
-                smallestResult = GetSmallerResult(smallestResult, result);
-
-                if (result.ImageBytes.Length <= DiscordEmojiSizeLimitBytes)
-                {
-                    return result;
-                }
+                return result;
             }
         }
 
@@ -79,7 +121,7 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
     {
         using var images = new MagickImageCollection(imageBytes);
 
-        images.Coalesce();
+        EnsureAnimatedGifIsSafeToOptimize(images);
 
         foreach (var image in images)
         {
@@ -164,4 +206,26 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
 
         return string.Join(", ", steps);
     }
+
+    private static void EnsureAnimatedGifIsSafeToOptimize(MagickImageCollection images)
+    {
+        if (images.Count > MaxAnimatedFrameCount)
+        {
+            throw new InvalidOperationException(
+                $"Animated emoji has {images.Count} frames, above the {MaxAnimatedFrameCount} frame optimization limit.");
+        }
+
+        foreach (var image in images)
+        {
+            var pixels = (ulong)image.Width * image.Height;
+
+            if (pixels > MaxAnimatedPixelsPerFrame)
+            {
+                throw new InvalidOperationException(
+                    $"Animated emoji has a {image.Width}x{image.Height} frame, above the optimization pixel limit.");
+            }
+        }
+    }
+
+    private sealed record AnimatedOptimizationStep(int? MaxDimension, int? Colors);
 }
