@@ -1,4 +1,6 @@
+using System.Net.Http;
 using Discord;
+using Discord.Net;
 using Discord.WebSocket;
 
 namespace FlowBot;
@@ -99,13 +101,39 @@ public sealed class EmojiImportHandler(HttpClient httpClient, ILogger<EmojiImpor
 
             await modal.FollowupAsync($"Imported {createdEmoji} as `:{createdEmoji.Name}:`.", ephemeral: true);
         }
+        catch (HttpException exception)
+        {
+            logger.LogWarning(exception, "Failed to import emoji {EmojiId} into server {GuildId}.", state.EmojiId, guild.Id);
+            await modal.FollowupAsync(
+                BuildDiscordUploadFailureMessage(exception),
+                ephemeral: true);
+        }
+        catch (HttpRequestException exception)
+        {
+            logger.LogWarning(exception, "Failed to download emoji {EmojiId} from Discord CDN.", state.EmojiId);
+            await modal.FollowupAsync(
+                "I could not download that emoji from Discord's CDN. It may no longer be available.",
+                ephemeral: true);
+        }
         catch (Exception exception)
         {
             logger.LogWarning(exception, "Failed to import emoji {EmojiId} into server {GuildId}.", state.EmojiId, guild.Id);
             await modal.FollowupAsync(
-                "I could not import that emoji. The server may be out of emoji slots, the image may be too large, or Discord rejected the upload.",
+                "I could not import that emoji because an unexpected error occurred.",
                 ephemeral: true);
         }
+    }
+
+    private static string BuildDiscordUploadFailureMessage(HttpException exception)
+    {
+        if (exception.DiscordCode == DiscordErrorCode.FailedToResizeAssetBelowTheMaximumSize)
+        {
+            return "Discord rejected that emoji because it could not resize the asset below 256 KB. This is most common with larger animated emojis.";
+        }
+
+        return string.IsNullOrWhiteSpace(exception.Reason)
+            ? "Discord rejected that emoji upload."
+            : $"Discord rejected that emoji upload: {exception.Reason}";
     }
 
     private static SocketGuild? GetGuild(SocketModal modal) =>
