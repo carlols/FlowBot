@@ -46,6 +46,7 @@ public sealed class SevenTvEmojiService(HttpClient httpClient, ILogger<SevenTvEm
         {
             return files
                 .Where(file => string.Equals(file.Format, "GIF", StringComparison.OrdinalIgnoreCase))
+                .Where(file => file.Size <= EmojiImageOptimizer.DiscordEmojiSizeLimitBytes)
                 .OrderByDescending(file => file.Width * file.Height)
                 .ThenByDescending(file => file.Size)
                 .Select(file => new SevenTvSelectedFile(file.Name, ConvertToPngBeforeUpload: false))

@@ -29,7 +29,7 @@ public sealed class HelpModule : InteractionModuleBase<SocketInteractionContext>
                 "Server owners and members with `Big Lord` can right-click a message with custom emojis and use `Apps > Import Emoji` to choose one, rename it, and add it to the server.")
             .AddField(
                 "/import-7tv-emoji",
-                "Server owners and members with `Big Lord` can import a 7TV emote from a link or emote ID, rename it, and add it to the server.")
+                "Server owners and members with `Big Lord` can import a Discord-sized 7TV emote from a link or emote ID, rename it, and add it to the server.")
             .AddField(
                 "/role-message",
                 "Admins can create a message that lets members add or remove a server role from themselves.")
