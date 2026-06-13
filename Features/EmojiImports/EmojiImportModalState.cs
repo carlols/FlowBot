@@ -1,6 +1,8 @@
 namespace FlowBot;
 
-public sealed record EmojiImportModalState(ulong EmojiId, bool IsAnimated)
+public sealed record EmojiImportModalState(string SourceId, bool IsAnimated, EmojiImportSource Source)
 {
-    public string CdnUrl => $"https://cdn.discordapp.com/emojis/{EmojiId}.{(IsAnimated ? "gif" : "png")}";
+    public string LogId => Source == EmojiImportSource.Discord
+        ? $"Discord emoji {SourceId}"
+        : $"7TV emote {SourceId}";
 }

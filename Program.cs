@@ -34,6 +34,7 @@ builder.Services.AddSingleton<PullCountGuessHandler>();
 builder.Services.AddSingleton<HttpClient>();
 builder.Services.AddSingleton<EmojiImportHandler>();
 builder.Services.AddSingleton<EmojiImageOptimizer>();
+builder.Services.AddSingleton<SevenTvEmojiService>();
 builder.Services.AddSingleton<RaidVoiceSplitHandler>();
 builder.Services.AddHostedService<DiscordBotService>();
 

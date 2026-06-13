@@ -7,9 +7,15 @@ public static class EmojiImportMessageBuilder
     public const int MaxSelectableEmojis = 25;
 
     public static Modal CreateNameModal(EmojiImportCandidate emoji) =>
+        CreateNameModal(EmojiImportIds.CreateModalId(emoji), emoji.Name);
+
+    public static Modal CreateSevenTvNameModal(SevenTvEmojiAsset emoji) =>
+        CreateNameModal(EmojiImportIds.CreateSevenTvModalId(emoji.Id, emoji.IsAnimated), emoji.Name);
+
+    private static Modal CreateNameModal(string customId, string emojiName) =>
         new ModalBuilder()
             .WithTitle("Import emoji")
-            .WithCustomId(EmojiImportIds.CreateModalId(emoji))
+            .WithCustomId(customId)
             .AddTextInput(
                 label: "Emoji name",
                 customId: EmojiImportIds.EmojiNameInputId,
@@ -18,7 +24,7 @@ public static class EmojiImportMessageBuilder
                 minLength: 2,
                 maxLength: 32,
                 required: true,
-                value: emoji.Name)
+                value: emojiName)
             .Build();
 
     public static MessageComponent CreateSelectionComponents(IReadOnlyList<EmojiImportCandidate> emojis)
