@@ -7,6 +7,7 @@ namespace FlowBot;
 
 public sealed class EmojiImportHandler(
     HttpClient httpClient,
+    SevenTvEmojiService sevenTvEmojiService,
     EmojiImageOptimizer imageOptimizer,
     ILogger<EmojiImportHandler> logger)
 {
@@ -94,20 +95,37 @@ public sealed class EmojiImportHandler(
 
         await modal.DeferAsync(ephemeral: true);
 
+        var asset = await ResolveImportAssetAsync(state);
+        if (asset is null)
+        {
+            await modal.FollowupAsync(
+                "I could not find that emoji source anymore. The original emote may have been deleted or changed.",
+                ephemeral: true);
+            return;
+        }
+
         try
         {
-            var imageBytes = await httpClient.GetByteArrayAsync(state.CdnUrl);
+            var imageBytes = await DownloadAndPrepareImageAsync(asset);
+            if (imageBytes is null)
+            {
+                await modal.FollowupAsync(
+                    "I could not prepare that emoji image for upload.",
+                    ephemeral: true);
+                return;
+            }
+
             var createdEmoji = await CreateEmoteAsync(guild, emojiName, imageBytes);
 
             await modal.FollowupAsync($"Imported {createdEmoji} as `:{createdEmoji.Name}:`.", ephemeral: true);
         }
         catch (HttpException exception) when (ShouldTryOptimization(exception))
         {
-            if (state.IsAnimated)
+            if (asset.IsAnimated)
             {
                 logger.LogInformation(
                     "Skipping optimization for animated emoji {EmojiId} in server {GuildId}.",
-                    state.EmojiId,
+                    asset.LogId,
                     guild.Id);
 
                 await modal.FollowupAsync(
@@ -116,25 +134,25 @@ public sealed class EmojiImportHandler(
                 return;
             }
 
-            await TryOptimizeAndImportStaticImageAsync(modal, guild, state, emojiName);
+            await TryOptimizeAndImportStaticImageAsync(modal, guild, asset, emojiName);
         }
         catch (HttpException exception)
         {
-            logger.LogWarning(exception, "Failed to import emoji {EmojiId} into server {GuildId}.", state.EmojiId, guild.Id);
+            logger.LogWarning(exception, "Failed to import emoji {EmojiId} into server {GuildId}.", asset.LogId, guild.Id);
             await modal.FollowupAsync(
                 BuildDiscordUploadFailureMessage(exception),
                 ephemeral: true);
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "Failed to download emoji {EmojiId} from Discord CDN.", state.EmojiId);
+            logger.LogWarning(exception, "Failed to download emoji {EmojiId}.", asset.LogId);
             await modal.FollowupAsync(
-                "I could not download that emoji from Discord's CDN. It may no longer be available.",
+                "I could not download that emoji. It may no longer be available.",
                 ephemeral: true);
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Failed to import emoji {EmojiId} into server {GuildId}.", state.EmojiId, guild.Id);
+            logger.LogWarning(exception, "Failed to import emoji {EmojiId} into server {GuildId}.", asset.LogId, guild.Id);
             await modal.FollowupAsync(
                 "I could not import that emoji because an unexpected error occurred.",
                 ephemeral: true);
@@ -144,12 +162,20 @@ public sealed class EmojiImportHandler(
     private async Task TryOptimizeAndImportStaticImageAsync(
         SocketModal modal,
         SocketGuild guild,
-        EmojiImportModalState state,
+        EmojiImportAsset asset,
         string emojiName)
     {
         try
         {
-            var imageBytes = await httpClient.GetByteArrayAsync(state.CdnUrl);
+            var imageBytes = await DownloadAndPrepareImageAsync(asset);
+            if (imageBytes is null)
+            {
+                await modal.FollowupAsync(
+                    "I could not prepare that emoji image for optimization.",
+                    ephemeral: true);
+                return;
+            }
+
             var optimizationResult = imageOptimizer.OptimizeStaticImage(imageBytes);
 
             if (optimizationResult is null)
@@ -168,16 +194,49 @@ public sealed class EmojiImportHandler(
         }
         catch (HttpException exception)
         {
-            logger.LogWarning(exception, "Failed to import optimized emoji {EmojiId} into server {GuildId}.", state.EmojiId, guild.Id);
+            logger.LogWarning(exception, "Failed to import optimized emoji {EmojiId} into server {GuildId}.", asset.LogId, guild.Id);
             await modal.FollowupAsync(BuildDiscordUploadFailureMessage(exception), ephemeral: true);
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Failed to optimize and import emoji {EmojiId} into server {GuildId}.", state.EmojiId, guild.Id);
+            logger.LogWarning(exception, "Failed to optimize and import emoji {EmojiId} into server {GuildId}.", asset.LogId, guild.Id);
             await modal.FollowupAsync(
                 "I could not import that emoji because image optimization failed unexpectedly.",
                 ephemeral: true);
         }
+    }
+
+    private async Task<EmojiImportAsset?> ResolveImportAssetAsync(EmojiImportModalState state)
+    {
+        if (state.Source == EmojiImportSource.Discord)
+        {
+            return new EmojiImportAsset(
+                state.LogId,
+                state.IsAnimated,
+                $"https://cdn.discordapp.com/emojis/{state.SourceId}.{(state.IsAnimated ? "gif" : "png")}",
+                ConvertToPngBeforeUpload: false);
+        }
+
+        var sevenTvEmoji = await sevenTvEmojiService.GetEmojiAsync(state.SourceId);
+        if (sevenTvEmoji is null)
+        {
+            return null;
+        }
+
+        return new EmojiImportAsset(
+            state.LogId,
+            sevenTvEmoji.IsAnimated,
+            sevenTvEmoji.CdnUrl,
+            sevenTvEmoji.ConvertToPngBeforeUpload);
+    }
+
+    private async Task<byte[]?> DownloadAndPrepareImageAsync(EmojiImportAsset asset)
+    {
+        var imageBytes = await httpClient.GetByteArrayAsync(asset.CdnUrl);
+
+        return asset.ConvertToPngBeforeUpload
+            ? imageOptimizer.ConvertStaticImageToPng(imageBytes)
+            : imageBytes;
     }
 
     private static async Task<GuildEmote> CreateEmoteAsync(
@@ -213,4 +272,10 @@ public sealed class EmojiImportHandler(
     private static SocketGuild? GetGuild(SocketMessageComponent component) =>
         (component.User as SocketGuildUser)?.Guild
         ?? (component.Channel as SocketGuildChannel)?.Guild;
+
+    private sealed record EmojiImportAsset(
+        string LogId,
+        bool IsAnimated,
+        string CdnUrl,
+        bool ConvertToPngBeforeUpload);
 }

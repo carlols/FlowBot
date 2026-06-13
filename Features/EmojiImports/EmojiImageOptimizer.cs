@@ -53,6 +53,34 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
         }
     }
 
+    public byte[]? ConvertStaticImageToPng(byte[] imageBytes)
+    {
+        if (!OptimizationLock.Wait(TimeSpan.FromSeconds(2)))
+        {
+            logger.LogInformation("Skipping image conversion because another image operation is already running.");
+            return null;
+        }
+
+        try
+        {
+            using var image = new MagickImage(imageBytes);
+            image.Strip();
+
+            using var stream = new MemoryStream();
+            image.Write(stream, MagickFormat.Png);
+            return stream.ToArray();
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Failed to convert emoji image to PNG.");
+            return null;
+        }
+        finally
+        {
+            OptimizationLock.Release();
+        }
+    }
+
     private static EmojiImageOptimizationResult? Optimize(byte[] imageBytes)
     {
         EmojiImageOptimizationResult? smallestResult = null;

@@ -8,7 +8,7 @@ FlowBot is a private Discord bot built with .NET 9 and Discord.Net.
 - `Configuration/`: strongly typed configuration objects.
 - `Discord/`: Discord client hosting, connection, and event routing.
 - `Features/`: larger feature areas grouped by domain.
-- `Features/EmojiImports/`: right-click message command for importing custom emojis.
+- `Features/EmojiImports/`: right-click message command and 7TV link command for importing custom emojis.
 - `Features/GroupFinder/`: joinable group finder messages for game sessions.
 - `Features/RaidVoiceSplits/`: admin controls for moving a role-based raid split into a voice channel.
 - `Features/RoleMessages/`: self-assignable role message command and button handling.
@@ -118,6 +118,21 @@ Required permissions:
 
 - The user running the command must be the server owner or have the `Big Lord` role.
 - FlowBot needs `Manage Emojis and Stickers`.
+
+### `/import-7tv-emoji`
+
+Imports a 7TV emote into the server from a 7TV emote link or raw emote ID. FlowBot fetches 7TV metadata, suggests the 7TV emote name in a private rename form, then uploads the largest available Discord-compatible asset it can find. Animated 7TV emotes use GIF. Static 7TV emotes prefer PNG and fall back to converting WEBP to PNG when 7TV does not expose a PNG file.
+
+Required permissions:
+
+- The user running the command must be the server owner or have the `Big Lord` role.
+- FlowBot needs `Manage Emojis and Stickers`.
+
+Example:
+
+```text
+/import-7tv-emoji link:https://7tv.app/emotes/01J0G490ER000396FKBWMCJG8G
+```
 
 ### `/group-finder`
 

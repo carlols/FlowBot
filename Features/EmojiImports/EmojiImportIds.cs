@@ -5,17 +5,22 @@ public static class EmojiImportIds
     public const string EmojiNameInputId = "emoji-name";
     public const string EmojiSelectId = "flowbot-emoji-select";
 
-    private const string ModalPrefix = "flowbot-emoji-import:";
+    private const string DiscordModalPrefix = "flowbot-emoji-import:";
+    private const string SevenTvModalPrefix = "flowbot-7tv-import:";
 
     public static string CreateModalId(EmojiImportCandidate emoji) =>
-        $"{ModalPrefix}{emoji.Id}:{(emoji.IsAnimated ? "a" : "s")}";
+        $"{DiscordModalPrefix}{emoji.Id}:{(emoji.IsAnimated ? "a" : "s")}";
+
+    public static string CreateSevenTvModalId(string emoteId, bool isAnimated) =>
+        $"{SevenTvModalPrefix}{emoteId}:{(isAnimated ? "a" : "s")}";
 
     public static string CreateSelectValue(EmojiImportCandidate emoji) =>
         $"{emoji.Id}:{(emoji.IsAnimated ? "a" : "s")}:{emoji.Name}";
 
     public static bool IsEmojiImportInteraction(string customId) =>
         customId == EmojiSelectId
-        || customId.StartsWith(ModalPrefix, StringComparison.Ordinal);
+        || customId.StartsWith(DiscordModalPrefix, StringComparison.Ordinal)
+        || customId.StartsWith(SevenTvModalPrefix, StringComparison.Ordinal);
 
     public static bool TryParseSelectValue(string value, out EmojiImportCandidate emoji)
     {
@@ -38,25 +43,42 @@ public static class EmojiImportIds
 
     public static bool TryParseModal(string customId, out EmojiImportModalState state)
     {
-        state = new EmojiImportModalState(0, false);
+        state = new EmojiImportModalState(string.Empty, false, EmojiImportSource.Discord);
 
-        if (!customId.StartsWith(ModalPrefix, StringComparison.Ordinal))
+        if (customId.StartsWith(DiscordModalPrefix, StringComparison.Ordinal))
         {
-            return false;
+            var values = customId[DiscordModalPrefix.Length..].Split(':', StringSplitOptions.RemoveEmptyEntries);
+            if (values.Length != 2 || !ulong.TryParse(values[0], out var emojiId))
+            {
+                return false;
+            }
+
+            if (values[1] is not ("a" or "s"))
+            {
+                return false;
+            }
+
+            state = new EmojiImportModalState(emojiId.ToString(), values[1] == "a", EmojiImportSource.Discord);
+            return true;
         }
 
-        var values = customId[ModalPrefix.Length..].Split(':', StringSplitOptions.RemoveEmptyEntries);
-        if (values.Length != 2 || !ulong.TryParse(values[0], out var emojiId))
+        if (customId.StartsWith(SevenTvModalPrefix, StringComparison.Ordinal))
         {
-            return false;
+            var values = customId[SevenTvModalPrefix.Length..].Split(':', StringSplitOptions.RemoveEmptyEntries);
+            if (values.Length != 2 || !SevenTvEmojiLinkParser.IsValidEmoteId(values[0]))
+            {
+                return false;
+            }
+
+            if (values[1] is not ("a" or "s"))
+            {
+                return false;
+            }
+
+            state = new EmojiImportModalState(values[0], values[1] == "a", EmojiImportSource.SevenTv);
+            return true;
         }
 
-        if (values[1] is not ("a" or "s"))
-        {
-            return false;
-        }
-
-        state = new EmojiImportModalState(emojiId, values[1] == "a");
-        return true;
+        return false;
     }
 }
