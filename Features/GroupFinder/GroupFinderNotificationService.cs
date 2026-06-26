@@ -42,13 +42,18 @@ public sealed class GroupFinderNotificationService(
         }
     }
 
-    public async Task SendSessionStartedAsync(IMessageChannel channel, GroupFinderSession session)
+    public async Task SendSessionStartedAsync(IMessageChannel channel, GroupFinderSession session, ulong groupMessageId)
     {
         var playerMentions = string.Join(" ", session.PlayerIds.Select(playerId => $"<@{playerId}>"));
 
         await channel.SendMessageAsync(
             text: $"**{session.GameName}** is starting. Time to group up!{Environment.NewLine}{playerMentions}",
-            allowedMentions: new AllowedMentions { UserIds = session.PlayerIds.ToList() });
+            allowedMentions: new AllowedMentions
+            {
+                UserIds = session.PlayerIds.ToList(),
+                MentionRepliedUser = false,
+            },
+            messageReference: new MessageReference(groupMessageId));
     }
 
     public async Task SendReadyCheckAsync(
@@ -89,6 +94,11 @@ public sealed class GroupFinderNotificationService(
         await channel.SendMessageAsync(
             text: text,
             components: components,
-            allowedMentions: new AllowedMentions { UserIds = session.PlayerIds.ToList() });
+            allowedMentions: new AllowedMentions
+            {
+                UserIds = session.PlayerIds.ToList(),
+                MentionRepliedUser = false,
+            },
+            messageReference: new MessageReference(groupMessageId));
     }
 }

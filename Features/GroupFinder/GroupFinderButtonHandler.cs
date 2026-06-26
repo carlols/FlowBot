@@ -5,6 +5,7 @@ namespace FlowBot;
 
 public sealed class GroupFinderButtonHandler(
     GroupFinderNotificationService notificationService,
+    GroupFinderRelatedMessageCleaner relatedMessageCleaner,
     ILogger<GroupFinderButtonHandler> logger)
 {
     public async Task HandleAsync(SocketMessageComponent component)
@@ -337,7 +338,7 @@ public sealed class GroupFinderButtonHandler(
                     updatedSession.SessionStarted);
             });
 
-            await notificationService.SendSessionStartedAsync(component.Channel, updatedSession);
+            await notificationService.SendSessionStartedAsync(component.Channel, updatedSession, userMessage.Id);
 
             await UpdateEphemeralResponseAsync(component, "Session started. Registered players have been notified.");
         }
@@ -371,7 +372,7 @@ public sealed class GroupFinderButtonHandler(
             .Build();
 
         await component.RespondAsync(
-            "You can close this group. Confirming will delete the group finder message.",
+            "You can close this group. Confirming will delete the group finder message and related Flowbot ready/start messages.",
             components: components,
             ephemeral: true);
     }
@@ -469,8 +470,14 @@ public sealed class GroupFinderButtonHandler(
                 return;
             }
 
+            var deletedRelatedMessages = await relatedMessageCleaner.DeleteRelatedMessagesAsync(message);
             await message.DeleteAsync();
-            await UpdateEphemeralResponseAsync(component, "Group closed.");
+
+            await UpdateEphemeralResponseAsync(
+                component,
+                deletedRelatedMessages > 0
+                    ? $"Group closed. Deleted {deletedRelatedMessages} related Flowbot message{(deletedRelatedMessages == 1 ? string.Empty : "s")}."
+                    : "Group closed.");
         }
         catch (Exception exception)
         {
