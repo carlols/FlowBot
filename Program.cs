@@ -29,6 +29,7 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton<RoleButtonHandler>();
 builder.Services.AddSingleton<GroupFinderButtonHandler>();
 builder.Services.AddSingleton<GroupFinderNotificationService>();
+builder.Services.AddSingleton<GroupFinderRelatedMessageCleaner>();
 builder.Services.AddSingleton<GroupFinderTimeParser>();
 builder.Services.AddSingleton<PullCountGuessHandler>();
 builder.Services.AddSingleton<HttpClient>();
