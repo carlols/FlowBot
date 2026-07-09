@@ -152,7 +152,7 @@ Example:
 /group-finder game-name:Counter-Strike 2 group-size:3 description:Premier queue? role-to-ping:@counterstrike time:20:00
 ```
 
-When `time` is provided, FlowBot renders it as a Discord timestamp like `<t:...:f> (<t:...:R>)`, so Discord shows the time in each viewer's local timezone plus a live relative countdown. Plain times are interpreted in `FlowBot:TimeZone`; `20:00` or `20.00` means the next upcoming 20:00 in that timezone.
+When `time` is provided, FlowBot renders it as a Discord timestamp like `<t:...:f> (<t:...:R>)`, so Discord shows the time in each viewer's local timezone plus a live relative countdown. Plain times are interpreted in `FlowBot:TimeZone`; `20:00` or `20.00` means the next upcoming 20:00 in that timezone. The group creator can click `Edit Time` before the session starts to update the start time with the same supported formats.
 
 The message updates as users click `Join group` or `Leave group`. When a fixed-size group fills for the first time, FlowBot sends the group creator a DM with a link back to the group message. The host or users with `Manage Messages`/`Administrator` can click `Close group`, then confirm, to remove the message. Closing a group also removes related Flowbot ready-check and session-started messages when Flowbot can identify them. The current player list, host, start time, capacity notice state, and session started state are stored in the Discord message/embed/components, so existing group finder messages continue to work after FlowBot restarts.
 

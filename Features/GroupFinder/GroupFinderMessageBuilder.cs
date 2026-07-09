@@ -7,6 +7,7 @@ public static partial class GroupFinderMessageBuilder
 {
     public const int ReadyCheckMessageMaxLength = 200;
     public const string ReadyCheckMessageInputId = "flowbot-group-ready-message";
+    public const string StartTimeInputId = "flowbot-group-start-time";
     public const string StatusFieldName = "Group";
     public const string HostFieldName = "Host";
     public const string StartsFieldName = "Starts";
@@ -69,6 +70,12 @@ public static partial class GroupFinderMessageBuilder
                 label: "Close",
                 customId: GroupFinderButtonIds.CreateCloseId(capacity, capacityNoticeSent, sessionStarted),
                 style: ButtonStyle.Danger)
+            .WithButton(
+                label: "Edit Time",
+                customId: GroupFinderButtonIds.CreateEditTimeId(capacity, capacityNoticeSent, sessionStarted),
+                style: ButtonStyle.Secondary,
+                disabled: sessionStarted,
+                row: 1)
             .Build();
     }
 

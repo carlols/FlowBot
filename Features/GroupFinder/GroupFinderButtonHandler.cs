@@ -6,6 +6,7 @@ namespace FlowBot;
 public sealed class GroupFinderButtonHandler(
     GroupFinderNotificationService notificationService,
     GroupFinderRelatedMessageCleaner relatedMessageCleaner,
+    GroupFinderTimeParser timeParser,
     ILogger<GroupFinderButtonHandler> logger)
 {
     public async Task HandleAsync(SocketMessageComponent component)
@@ -67,6 +68,12 @@ public sealed class GroupFinderButtonHandler(
             return;
         }
 
+        if (buttonState.Action == GroupFinderButtonAction.EditTime)
+        {
+            await EditTimeAsync(component, session);
+            return;
+        }
+
         if (buttonState.Action == GroupFinderButtonAction.Join)
         {
             if (isRegistered)
@@ -112,6 +119,16 @@ public sealed class GroupFinderButtonHandler(
         await component.FollowupAsync("You left the group.", ephemeral: true);
     }
 
+    public async Task HandleModalAsync(SocketModal modal)
+    {
+        if (GroupFinderButtonIds.TryParseEditTimeModal(modal.Data.CustomId, out var editTimeState))
+        {
+            await HandleEditTimeModalAsync(modal, editTimeState);
+            return;
+        }
+
+        await HandleReadyCheckModalAsync(modal);
+    }
     public async Task HandleReadyCheckModalAsync(SocketModal modal)
     {
         if (!GroupFinderButtonIds.TryParseReadyCheckModal(modal.Data.CustomId, out var modalState))
@@ -196,6 +213,104 @@ public sealed class GroupFinderButtonHandler(
         }
     }
 
+    private async Task HandleEditTimeModalAsync(SocketModal modal, GroupFinderEditTimeModalState modalState)
+    {
+        var timeInput = modal.Data.Components
+            .FirstOrDefault(component => component.CustomId == GroupFinderMessageBuilder.StartTimeInputId)
+            ?.Value;
+
+        if (!timeParser.TryParse(timeInput, out var startsAtUnixTimeSeconds, out var errorMessage)
+            || startsAtUnixTimeSeconds is null)
+        {
+            await modal.RespondAsync(
+                string.IsNullOrWhiteSpace(errorMessage)
+                    ? "Please enter a start time."
+                    : errorMessage,
+                ephemeral: true);
+            return;
+        }
+
+        try
+        {
+            var originalMessage = await modal.Channel.GetMessageAsync(modalState.MessageId);
+
+            if (originalMessage is not IUserMessage userMessage)
+            {
+                await modal.RespondAsync("That group message no longer exists.", ephemeral: true);
+                return;
+            }
+
+            if (!GroupFinderMessageBuilder.TryReadSession(
+                    userMessage,
+                    modalState.Capacity,
+                    modalState.CapacityNoticeSent,
+                    modalState.SessionStarted,
+                    out var session)
+                || session.HostUserId != modal.User.Id)
+            {
+                await modal.RespondAsync("Only the group creator can edit the start time.", ephemeral: true);
+                return;
+            }
+
+            if (session.SessionStarted)
+            {
+                await modal.RespondAsync("This session has already been started.", ephemeral: true);
+                return;
+            }
+
+            var updatedSession = session with { StartsAtUnixTimeSeconds = startsAtUnixTimeSeconds };
+
+            await userMessage.ModifyAsync(properties =>
+            {
+                properties.Embed = GroupFinderMessageBuilder.BuildEmbed(updatedSession);
+                properties.Components = GroupFinderMessageBuilder.BuildComponents(
+                    updatedSession.Capacity,
+                    updatedSession.PlayerIds.Count,
+                    updatedSession.CapacityNoticeSent,
+                    updatedSession.SessionStarted);
+            });
+
+            await modal.RespondAsync("Start time updated.", ephemeral: true);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Failed to edit start time for group finder message {MessageId}.", modalState.MessageId);
+            await modal.RespondAsync("I could not update the start time.", ephemeral: true);
+        }
+    }
+    private async Task EditTimeAsync(SocketMessageComponent component, GroupFinderSession session)
+    {
+        if (component.User.Id != session.HostUserId)
+        {
+            await component.RespondAsync("Only the group creator can edit the start time.", ephemeral: true);
+            return;
+        }
+
+        if (session.SessionStarted)
+        {
+            await component.RespondAsync("This session has already been started.", ephemeral: true);
+            return;
+        }
+
+        var modal = new ModalBuilder()
+            .WithTitle("Edit start time")
+            .WithCustomId(GroupFinderButtonIds.CreateEditTimeModalId(
+                component.Message.Id,
+                session.Capacity,
+                session.CapacityNoticeSent,
+                session.SessionStarted))
+            .AddTextInput(
+                label: "Start time",
+                customId: GroupFinderMessageBuilder.StartTimeInputId,
+                style: TextInputStyle.Short,
+                placeholder: "20:00, 17.00, tomorrow 20:00, or 2026-04-28 20:00",
+                minLength: 1,
+                maxLength: 64,
+                required: true)
+            .Build();
+
+        await component.RespondWithModalAsync(modal);
+    }
     private async Task ReadyCheckAsync(SocketMessageComponent component, GroupFinderSession session)
     {
         if (component.User.Id != session.HostUserId)

@@ -5,6 +5,7 @@ public enum GroupFinderButtonAction
     Join,
     Leave,
     ReadyCheck,
+    EditTime,
     Ready,
     NotReady,
     Start,
