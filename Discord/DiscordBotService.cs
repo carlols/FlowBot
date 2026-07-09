@@ -183,7 +183,7 @@ public sealed class DiscordBotService(
         if (interaction is SocketModal groupFinderModal
             && GroupFinderButtonIds.IsGroupFinderButton(groupFinderModal.Data.CustomId))
         {
-            await groupFinderButtonHandler.HandleReadyCheckModalAsync(groupFinderModal);
+            await groupFinderButtonHandler.HandleModalAsync(groupFinderModal);
             return;
         }
 

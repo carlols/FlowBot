@@ -6,6 +6,8 @@ public static class GroupFinderButtonIds
     private const string LeavePrefix = "flowbot-group-leave:";
     private const string ReadyCheckPrefix = "flowbot-group-ready-check:";
     private const string ReadyCheckModalPrefix = "flowbot-group-ready-modal:";
+    private const string EditTimePrefix = "flowbot-group-edit-time:";
+    private const string EditTimeModalPrefix = "flowbot-group-edit-time-modal:";
     private const string ReadyPrefix = "flowbot-group-ready:";
     private const string NotReadyPrefix = "flowbot-group-not-ready:";
     private const string StartPrefix = "flowbot-group-start:";
@@ -31,6 +33,16 @@ public static class GroupFinderButtonIds
         bool capacityNoticeSent,
         bool sessionStarted) =>
         $"{ReadyCheckModalPrefix}{messageId}:{FormatCapacity(capacity)}:{FormatState(capacityNoticeSent)}:{FormatState(sessionStarted)}";
+
+    public static string CreateEditTimeId(int? capacity, bool capacityNoticeSent, bool sessionStarted) =>
+        $"{EditTimePrefix}{FormatCapacity(capacity)}:{FormatState(capacityNoticeSent)}:{FormatState(sessionStarted)}";
+
+    public static string CreateEditTimeModalId(
+        ulong messageId,
+        int? capacity,
+        bool capacityNoticeSent,
+        bool sessionStarted) =>
+        $"{EditTimeModalPrefix}{messageId}:{FormatCapacity(capacity)}:{FormatState(capacityNoticeSent)}:{FormatState(sessionStarted)}";
 
     public static string CreateReadyId(
         ulong messageId,
@@ -72,6 +84,8 @@ public static class GroupFinderButtonIds
         || customId.StartsWith(LeavePrefix, StringComparison.Ordinal)
         || customId.StartsWith(ReadyCheckPrefix, StringComparison.Ordinal)
         || customId.StartsWith(ReadyCheckModalPrefix, StringComparison.Ordinal)
+        || customId.StartsWith(EditTimePrefix, StringComparison.Ordinal)
+        || customId.StartsWith(EditTimeModalPrefix, StringComparison.Ordinal)
         || customId.StartsWith(ReadyPrefix, StringComparison.Ordinal)
         || customId.StartsWith(NotReadyPrefix, StringComparison.Ordinal)
         || customId.StartsWith(StartPrefix, StringComparison.Ordinal)
@@ -94,6 +108,11 @@ public static class GroupFinderButtonIds
         }
 
         if (TryParse(customId, ReadyCheckPrefix, GroupFinderButtonAction.ReadyCheck, out state))
+        {
+            return true;
+        }
+
+        if (TryParse(customId, EditTimePrefix, GroupFinderButtonAction.EditTime, out state))
         {
             return true;
         }
@@ -128,6 +147,28 @@ public static class GroupFinderButtonIds
         return true;
     }
 
+
+    public static bool TryParseEditTimeModal(string customId, out GroupFinderEditTimeModalState state)
+    {
+        state = new GroupFinderEditTimeModalState(0, null, null, null);
+
+        if (!customId.StartsWith(EditTimeModalPrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var values = customId[EditTimeModalPrefix.Length..].Split(':', StringSplitOptions.RemoveEmptyEntries);
+
+        if (values.Length != 4
+            || !ulong.TryParse(values[0], out var messageId)
+            || !TryParseCapacity(values[1], out var capacity))
+        {
+            return false;
+        }
+
+        state = new GroupFinderEditTimeModalState(messageId, capacity, values[2] == "1", values[3] == "1");
+        return true;
+    }
     public static bool TryParseReadyResponse(string customId, out GroupFinderReadyResponseState state)
     {
         if (TryParseReadyResponse(customId, ReadyPrefix, GroupFinderButtonAction.Ready, out state))
