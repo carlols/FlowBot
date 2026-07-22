@@ -14,6 +14,7 @@ public static partial class GroupFinderMessageBuilder
     public const string NoticeFieldName = "Notice";
     public const string LegacyFullNotificationNotice = "Group filled and players notified.";
     public const string PlayersFieldName = "Players";
+    private const string TeamFieldPrefix = "Team ";
 
     public static Embed BuildEmbed(GroupFinderSession session)
     {
@@ -36,6 +37,7 @@ public static partial class GroupFinderMessageBuilder
         }
 
         embed.AddField(PlayersFieldName, FormatPlayers(session));
+        AddTeamFields(embed, session.TeamIds);
 
         return embed.Build();
     }
@@ -71,6 +73,11 @@ public static partial class GroupFinderMessageBuilder
                 customId: GroupFinderButtonIds.CreateCloseId(capacity, capacityNoticeSent, sessionStarted),
                 style: ButtonStyle.Danger)
             .WithButton(
+                label: "Scramble Teams",
+                customId: GroupFinderButtonIds.CreateScrambleTeamsId(capacity, capacityNoticeSent, sessionStarted),
+                style: ButtonStyle.Secondary,
+                row: 1)
+            .WithButton(
                 label: "Edit Time",
                 customId: GroupFinderButtonIds.CreateEditTimeId(capacity, capacityNoticeSent, sessionStarted),
                 style: ButtonStyle.Secondary,
@@ -86,7 +93,7 @@ public static partial class GroupFinderMessageBuilder
         bool? sessionStartedFromComponents,
         out GroupFinderSession session)
     {
-        session = new GroupFinderSession("Unknown game", null, capacity, 0, null, false, false, [], new Dictionary<ulong, GroupFinderReadyState>());
+        session = new GroupFinderSession("Unknown game", null, capacity, 0, null, false, false, [], new Dictionary<ulong, GroupFinderReadyState>(), []);
 
         var embed = message.Embeds.FirstOrDefault();
 
@@ -119,6 +126,8 @@ public static partial class GroupFinderMessageBuilder
             .Select(match => ulong.Parse(match.Groups["id"].Value))
             .Distinct()
             .ToArray();
+        var playerIdSet = playerIds.ToHashSet();
+        var teamIds = ReadTeams(embed.Fields, playerIdSet);
         var readyStates = playerMatches
             .Where(match => TryParseReadyState(match.Groups["state"].Value, out _))
             .Select(match =>
@@ -139,9 +148,53 @@ public static partial class GroupFinderMessageBuilder
             capacityNoticeSent,
             sessionStarted,
             playerIds,
-            readyStates);
+            readyStates,
+            teamIds);
         return true;
     }
+
+    private static void AddTeamFields(EmbedBuilder embed, IReadOnlyList<IReadOnlyList<ulong>> teamIds)
+    {
+        for (var index = 0; index < teamIds.Count; index++)
+        {
+            if (teamIds[index].Count == 0)
+            {
+                continue;
+            }
+
+            embed.AddField($"{TeamFieldPrefix}{index + 1}", FormatTeam(teamIds[index]), inline: true);
+        }
+    }
+
+    private static IReadOnlyList<IReadOnlyList<ulong>> ReadTeams(IEnumerable<EmbedField> fields, ISet<ulong> playerIds)
+    {
+        var assignedPlayerIds = new HashSet<ulong>();
+        var teams = new List<IReadOnlyList<ulong>>();
+        var teamFields = fields
+            .Where(field => field.Name.StartsWith(TeamFieldPrefix, StringComparison.Ordinal))
+            .OrderBy(field => ReadTeamNumber(field.Name));
+
+        foreach (var teamField in teamFields)
+        {
+            var teamPlayerIds = PlayerMentionRegex()
+                .Matches(teamField.Value ?? string.Empty)
+                .Select(match => ulong.Parse(match.Groups["id"].Value))
+                .Where(playerId => playerIds.Contains(playerId) && assignedPlayerIds.Add(playerId))
+                .ToArray();
+
+            if (teamPlayerIds.Length > 0)
+            {
+                teams.Add(teamPlayerIds);
+            }
+        }
+
+        return teams;
+    }
+
+    private static int ReadTeamNumber(string fieldName) =>
+        int.TryParse(fieldName[TeamFieldPrefix.Length..], out var teamNumber)
+            ? teamNumber
+            : int.MaxValue;
 
     private static string FormatStatus(GroupFinderSession session)
     {
@@ -184,6 +237,11 @@ public static partial class GroupFinderMessageBuilder
                     : row;
             }));
     }
+
+    private static string FormatTeam(IReadOnlyList<ulong> playerIds) =>
+        string.Join(
+            Environment.NewLine,
+            playerIds.Select((playerId, index) => $"{index + 1}. <@{playerId}>"));
 
     private static string FormatReadyState(GroupFinderReadyState state) =>
         state switch
