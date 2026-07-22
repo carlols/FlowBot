@@ -179,7 +179,8 @@ Group finder lives in `Features/GroupFinder`.
 - optional start time
 - host
 - player list
-- join, leave, and close buttons
+- optional team assignments
+- join, leave, ready check, scramble teams, start, edit time, and close buttons
 
 The creator is automatically player 1.
 
@@ -187,8 +188,9 @@ The group finder is intentionally stateless. FlowBot does not use a database yet
 
 - host user ID is stored in the embed
 - player list is stored in the embed
+- team assignments are stored in embed fields
 - start time is stored in the embed timestamp field
-- group capacity is encoded in button custom IDs
+- group capacity, capacity-notice state, and session-started state are encoded in button custom IDs
 
 When someone clicks `Join group`, `GroupFinderButtonHandler`:
 
@@ -198,7 +200,10 @@ When someone clicks `Join group`, `GroupFinderButtonHandler`:
 4. Checks whether the user is already registered.
 5. Checks whether the group is full.
 6. Updates the player list.
-7. Edits the original Discord message.
+7. Clears any stale team assignments.
+8. Edits the original Discord message.
+
+When the creator clicks `Scramble Teams`, `GroupFinderButtonHandler` reads the current player list, randomizes it into two teams, and edits the same group message. Because the team list is stored in the embed, the teams can be scrambled again after a restart.
 
 The close flow is two-step:
 

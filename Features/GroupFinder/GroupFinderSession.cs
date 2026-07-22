@@ -11,7 +11,8 @@ public sealed record GroupFinderSession(
     bool CapacityNoticeSent,
     bool SessionStarted,
     IReadOnlyList<ulong> PlayerIds,
-    IReadOnlyDictionary<ulong, GroupFinderReadyState> ReadyStates)
+    IReadOnlyDictionary<ulong, GroupFinderReadyState> ReadyStates,
+    IReadOnlyList<IReadOnlyList<ulong>> TeamIds)
 {
     public const int MinCapacity = 1;
     public const int MaxCapacity = 30;
@@ -36,6 +37,7 @@ public sealed record GroupFinderSession(
             false,
             false,
             [creator.Id],
-            new Dictionary<ulong, GroupFinderReadyState>());
+            new Dictionary<ulong, GroupFinderReadyState>(),
+            []);
     }
 }

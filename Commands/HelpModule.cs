@@ -17,7 +17,7 @@ public sealed class HelpModule : InteractionModuleBase<SocketInteractionContext>
                 "Create a joinable group for a game or activity. Use `game-name`, then optionally add a max player count, start time, description, or role ping.")
             .AddField(
                 "Group buttons",
-                "`Join` and `Leave` update the player list. The group creator can use `Edit Time`, `Start`, and `Close` to manage the group.")
+                "`Join` and `Leave` update the player list. The group creator can use `Scramble Teams`, `Edit Time`, `Start`, and `Close` to manage the group.")
             .AddField(
                 "/guess-pull-count",
                 "Admins can start a World of Warcraft boss pull-count guessing board. Members use the buttons to add, update, or remove their guesses.")

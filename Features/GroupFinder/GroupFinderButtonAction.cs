@@ -6,6 +6,7 @@ public enum GroupFinderButtonAction
     Leave,
     ReadyCheck,
     EditTime,
+    ScrambleTeams,
     Ready,
     NotReady,
     Start,

@@ -7,6 +7,7 @@ public sealed class GroupFinderButtonHandler(
     GroupFinderNotificationService notificationService,
     GroupFinderRelatedMessageCleaner relatedMessageCleaner,
     GroupFinderTimeParser timeParser,
+    GroupFinderTeamScrambler teamScrambler,
     ILogger<GroupFinderButtonHandler> logger)
 {
     public async Task HandleAsync(SocketMessageComponent component)
@@ -74,6 +75,12 @@ public sealed class GroupFinderButtonHandler(
             return;
         }
 
+        if (buttonState.Action == GroupFinderButtonAction.ScrambleTeams)
+        {
+            await ScrambleTeamsAsync(component, session);
+            return;
+        }
+
         if (buttonState.Action == GroupFinderButtonAction.Join)
         {
             if (isRegistered)
@@ -89,7 +96,7 @@ public sealed class GroupFinderButtonHandler(
             }
 
             playerIds.Add(userId);
-            var updatedSession = session with { PlayerIds = playerIds };
+            var updatedSession = session with { PlayerIds = playerIds, TeamIds = [] };
 
             if (updatedSession.IsFull && !session.CapacityNoticeSent)
             {
@@ -115,7 +122,7 @@ public sealed class GroupFinderButtonHandler(
         var readyStates = session.ReadyStates
             .Where(pair => pair.Key != userId)
             .ToDictionary(pair => pair.Key, pair => pair.Value);
-        await UpdateGroupMessageAsync(component, session with { PlayerIds = playerIds, ReadyStates = readyStates });
+        await UpdateGroupMessageAsync(component, session with { PlayerIds = playerIds, ReadyStates = readyStates, TeamIds = [] });
         await component.FollowupAsync("You left the group.", ephemeral: true);
     }
 
@@ -129,6 +136,7 @@ public sealed class GroupFinderButtonHandler(
 
         await HandleReadyCheckModalAsync(modal);
     }
+
     public async Task HandleReadyCheckModalAsync(SocketModal modal)
     {
         if (!GroupFinderButtonIds.TryParseReadyCheckModal(modal.Data.CustomId, out var modalState))
@@ -311,6 +319,27 @@ public sealed class GroupFinderButtonHandler(
 
         await component.RespondWithModalAsync(modal);
     }
+
+    private async Task ScrambleTeamsAsync(SocketMessageComponent component, GroupFinderSession session)
+    {
+        if (component.User.Id != session.HostUserId)
+        {
+            await component.RespondAsync("Only the group creator can scramble teams.", ephemeral: true);
+            return;
+        }
+
+        if (session.PlayerIds.Count < 2)
+        {
+            await component.RespondAsync("Team scrambling needs at least two registered players.", ephemeral: true);
+            return;
+        }
+
+        var teams = teamScrambler.CreateTeams(session.PlayerIds);
+
+        await UpdateGroupMessageAsync(component, session with { TeamIds = teams });
+        await component.FollowupAsync("Teams scrambled.", ephemeral: true);
+    }
+
     private async Task ReadyCheckAsync(SocketMessageComponent component, GroupFinderSession session)
     {
         if (component.User.Id != session.HostUserId)
