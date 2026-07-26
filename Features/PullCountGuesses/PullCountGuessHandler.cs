@@ -100,7 +100,7 @@ public sealed class PullCountGuessHandler(ILogger<PullCountGuessHandler> logger)
             await userMessage.ModifyAsync(properties =>
             {
                 properties.Embed = PullCountGuessMessageBuilder.BuildEmbed(updatedSession);
-                properties.Components = PullCountGuessMessageBuilder.BuildComponents(updatedSession.IsClosed);
+                properties.Components = PullCountGuessMessageBuilder.BuildComponents(updatedSession);
             });
 
             await modal.RespondAsync($"Your guess is now {pullCount}.", ephemeral: true);
@@ -153,7 +153,7 @@ public sealed class PullCountGuessHandler(ILogger<PullCountGuessHandler> logger)
         await component.UpdateAsync(properties =>
         {
             properties.Embed = PullCountGuessMessageBuilder.BuildEmbed(updatedSession);
-            properties.Components = PullCountGuessMessageBuilder.BuildComponents(updatedSession.IsClosed);
+            properties.Components = PullCountGuessMessageBuilder.BuildComponents(updatedSession);
         });
         await component.FollowupAsync("Your guess was removed.", ephemeral: true);
     }
@@ -220,7 +220,7 @@ public sealed class PullCountGuessHandler(ILogger<PullCountGuessHandler> logger)
             await userMessage.ModifyAsync(properties =>
             {
                 properties.Embed = PullCountGuessMessageBuilder.BuildEmbed(closedSession);
-                properties.Components = PullCountGuessMessageBuilder.BuildComponents(closedSession.IsClosed);
+                properties.Components = PullCountGuessMessageBuilder.BuildComponents(closedSession);
             });
             await UpdateEphemeralResponseAsync(component, "Guessing closed.");
         }

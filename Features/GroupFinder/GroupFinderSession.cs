@@ -15,6 +15,8 @@ public sealed record GroupFinderSession(
     IReadOnlyList<IReadOnlyList<ulong>> TeamIds)
 {
     public const int MinCapacity = 1;
+    public const int MaxGameNameLength = 256;
+    public const int MaxDescriptionLength = 4096;
     public const int MaxCapacity = 30;
 
     public bool IsFull => Capacity is { } capacity && PlayerIds.Count >= capacity;
