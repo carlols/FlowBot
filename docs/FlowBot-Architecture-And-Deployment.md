@@ -29,12 +29,13 @@ Important registered services:
 
 - `DiscordSocketClient`: the live websocket client connected to Discord.
 - `InteractionService`: Discord.Net's slash command and module system.
-- `DiscordBotService`: our background service that starts and owns the bot lifecycle.
+- DiscordBotService: our background service that starts and owns the bot lifecycle.
+- DiscordInteractionRouter: sends components, modals, and commands to the correct feature handler.
 - Feature handlers like `RoleButtonHandler` and `GroupFinderButtonHandler`.
 
 ## 3. Bot Lifecycle
 
-`Discord/DiscordBotService.cs` is the engine room.
+`Discord/DiscordBotService.cs` owns the connection lifecycle and command registration. `Discord/DiscordInteractionRouter.cs` owns interaction dispatch.
 
 When the application starts, `ExecuteAsync` runs. It:
 
@@ -81,7 +82,7 @@ Examples:
 Commands are registered when Discord reports that the bot is ready:
 
 ```csharp
-client.Ready += RegisterCommandsAsync;
+client.Ready += HandleReadyAsync;
 ```
 
 Inside `RegisterCommandsAsync`, FlowBot uses:
@@ -98,35 +99,24 @@ Server-scoped command registration updates quickly, which is ideal for developme
 
 When someone runs `/ping`, `/role-message`, or `/group-finder`, Discord sends an `InteractionCreated` event.
 
-That event enters:
+That event enters `DiscordInteractionRouter.RouteAsync`.
+
+The router first checks the interaction type. Component custom IDs and modal custom IDs identify which feature handler owns an interaction. For example:
 
 ```csharp
-private async Task HandleInteractionAsync(SocketInteraction interaction)
+if (GroupFinderButtonIds.IsGroupFinderButton(component.Data.CustomId))
+{
+    await groupFinderButtonHandler.HandleAsync(component);
+    return;
+}
 ```
 
-FlowBot first checks whether the interaction is a button click that a feature handles manually.
-
-Role message buttons:
-
-```csharp
-if (interaction is SocketMessageComponent component
-    && RoleButtonIds.IsRoleButton(component.Data.CustomId))
-```
-
-Group finder buttons:
-
-```csharp
-if (interaction is SocketMessageComponent groupFinderComponent
-    && GroupFinderButtonIds.IsGroupFinderButton(groupFinderComponent.Data.CustomId))
-```
-
-If it is not one of those buttons, the interaction is handed to Discord.Net's command system:
+If no manual component or modal handler owns the interaction, the router hands it to Discord.Net's command system:
 
 ```csharp
 var context = new SocketInteractionContext(client, interaction);
 var result = await interactions.ExecuteCommandAsync(context, services);
 ```
-
 That is what invokes command methods such as:
 
 ```csharp
@@ -159,7 +149,7 @@ flowbot-role-remove:<roleId>
 
 When someone clicks a button:
 
-1. `DiscordBotService` recognizes the custom ID.
+1. `DiscordInteractionRouter` recognizes the custom ID.
 2. It calls `RoleButtonHandler`.
 3. The handler parses the role ID.
 4. It checks role existence, role hierarchy, and whether the user already has the role.
@@ -192,11 +182,11 @@ The group finder is intentionally stateless. FlowBot does not use a database yet
 - start time is stored in the embed timestamp field
 - group capacity, capacity-notice state, and session-started state are encoded in button custom IDs
 
-When someone clicks `Join group`, `GroupFinderButtonHandler`:
+When someone clicks `Join`, `GroupFinderButtonHandler`:
 
 1. Parses the button custom ID.
 2. Reads the current embed.
-3. Reconstructs the session state.
+3. Uses `GroupFinderMessageParser` to reconstruct the session state.
 4. Checks whether the user is already registered.
 5. Checks whether the group is full.
 6. Updates the player list.
@@ -207,7 +197,7 @@ When the creator clicks `Scramble Teams`, `GroupFinderButtonHandler` reads the c
 
 The close flow is two-step:
 
-1. User clicks `Close group`.
+1. User clicks `Close`.
 2. FlowBot checks whether the user is the host, has `Manage Messages`, or has `Administrator`.
 3. If allowed, FlowBot shows an ephemeral confirmation.
 4. The group message is deleted only after `Confirm close`.

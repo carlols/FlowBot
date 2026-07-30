@@ -3,13 +3,27 @@ using Discord.WebSocket;
 
 namespace FlowBot;
 
-public sealed class GroupFinderButtonHandler(
-    GroupFinderNotificationService notificationService,
-    GroupFinderRelatedMessageCleaner relatedMessageCleaner,
-    GroupFinderTimeParser timeParser,
-    GroupFinderTeamScrambler teamScrambler,
-    ILogger<GroupFinderButtonHandler> logger)
+public sealed partial class GroupFinderButtonHandler
 {
+    private readonly GroupFinderNotificationService _notificationService;
+    private readonly GroupFinderRelatedMessageCleaner _relatedMessageCleaner;
+    private readonly GroupFinderTimeParser _timeParser;
+    private readonly GroupFinderTeamScrambler _teamScrambler;
+    private readonly ILogger<GroupFinderButtonHandler> _logger;
+
+    public GroupFinderButtonHandler(
+        GroupFinderNotificationService notificationService,
+        GroupFinderRelatedMessageCleaner relatedMessageCleaner,
+        GroupFinderTimeParser timeParser,
+        GroupFinderTeamScrambler teamScrambler,
+        ILogger<GroupFinderButtonHandler> logger)
+    {
+        _notificationService = notificationService;
+        _relatedMessageCleaner = relatedMessageCleaner;
+        _timeParser = timeParser;
+        _teamScrambler = teamScrambler;
+        _logger = logger;
+    }
     public async Task HandleAsync(SocketMessageComponent component)
     {
         if (GroupFinderButtonIds.TryParseReadyResponse(component.Data.CustomId, out var readyResponse))
@@ -36,7 +50,7 @@ public sealed class GroupFinderButtonHandler(
             return;
         }
 
-        if (!GroupFinderMessageBuilder.TryReadSession(
+        if (!GroupFinderMessageParser.TryReadSession(
             component.Message,
             buttonState.Capacity,
             buttonState.CapacityNoticeSent,
@@ -102,7 +116,7 @@ public sealed class GroupFinderButtonHandler(
             {
                 updatedSession = updatedSession with { CapacityNoticeSent = true };
                 await UpdateGroupMessageAsync(component, updatedSession);
-                await notificationService.SendCapacityNoticeAsync(component, updatedSession);
+                await _notificationService.SendCapacityNoticeAsync(component, updatedSession);
                 await component.FollowupAsync("You joined the group.", ephemeral: true);
                 return;
             }
@@ -137,514 +151,6 @@ public sealed class GroupFinderButtonHandler(
         await HandleReadyCheckModalAsync(modal);
     }
 
-    public async Task HandleReadyCheckModalAsync(SocketModal modal)
-    {
-        if (!GroupFinderButtonIds.TryParseReadyCheckModal(modal.Data.CustomId, out var modalState))
-        {
-            await modal.RespondAsync("I could not identify this ready check form.", ephemeral: true);
-            return;
-        }
-
-        var message = modal.Data.Components
-            .FirstOrDefault(component => component.CustomId == GroupFinderMessageBuilder.ReadyCheckMessageInputId)
-            ?.Value;
-
-        if (message?.Length > GroupFinderMessageBuilder.ReadyCheckMessageMaxLength)
-        {
-            await modal.RespondAsync(
-                $"Ready check messages can be at most {GroupFinderMessageBuilder.ReadyCheckMessageMaxLength} characters.",
-                ephemeral: true);
-            return;
-        }
-
-        try
-        {
-            var originalMessage = await modal.Channel.GetMessageAsync(modalState.MessageId);
-
-            if (originalMessage is not IUserMessage userMessage)
-            {
-                await modal.RespondAsync("That group message no longer exists.", ephemeral: true);
-                return;
-            }
-
-            if (!GroupFinderMessageBuilder.TryReadSession(
-                    userMessage,
-                    modalState.Capacity,
-                    modalState.CapacityNoticeSent,
-                    modalState.SessionStarted,
-                    out var session)
-                || session.HostUserId != modal.User.Id)
-            {
-                await modal.RespondAsync("Only the group creator can start a ready check.", ephemeral: true);
-                return;
-            }
-
-            if (session.HasActiveReadyCheck)
-            {
-                await modal.RespondAsync("This group already has an active ready check.", ephemeral: true);
-                return;
-            }
-
-            if (session.PlayerIds.Count < 2)
-            {
-                await modal.RespondAsync("Ready checks need at least two registered players.", ephemeral: true);
-                return;
-            }
-
-            var readyStates = session.PlayerIds.ToDictionary(
-                playerId => playerId,
-                _ => GroupFinderReadyState.Waiting);
-            var updatedSession = session with { ReadyStates = readyStates };
-
-            await userMessage.ModifyAsync(properties =>
-            {
-                properties.Embed = GroupFinderMessageBuilder.BuildEmbed(updatedSession);
-                properties.Components = GroupFinderMessageBuilder.BuildComponents(
-                    updatedSession.Capacity,
-                    updatedSession.PlayerIds.Count,
-                    updatedSession.CapacityNoticeSent,
-                    updatedSession.SessionStarted);
-            });
-
-            await notificationService.SendReadyCheckAsync(
-                modal.Channel,
-                updatedSession,
-                userMessage.Id,
-                message);
-
-            await modal.RespondAsync("Ready check sent.", ephemeral: true);
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "Failed to start ready check for message {MessageId}.", modalState.MessageId);
-            await modal.RespondAsync("I could not start this ready check.", ephemeral: true);
-        }
-    }
-
-    private async Task HandleEditTimeModalAsync(SocketModal modal, GroupFinderEditTimeModalState modalState)
-    {
-        var timeInput = modal.Data.Components
-            .FirstOrDefault(component => component.CustomId == GroupFinderMessageBuilder.StartTimeInputId)
-            ?.Value;
-
-        if (!timeParser.TryParse(timeInput, out var startsAtUnixTimeSeconds, out var errorMessage)
-            || startsAtUnixTimeSeconds is null)
-        {
-            await modal.RespondAsync(
-                string.IsNullOrWhiteSpace(errorMessage)
-                    ? "Please enter a start time."
-                    : errorMessage,
-                ephemeral: true);
-            return;
-        }
-
-        try
-        {
-            var originalMessage = await modal.Channel.GetMessageAsync(modalState.MessageId);
-
-            if (originalMessage is not IUserMessage userMessage)
-            {
-                await modal.RespondAsync("That group message no longer exists.", ephemeral: true);
-                return;
-            }
-
-            if (!GroupFinderMessageBuilder.TryReadSession(
-                    userMessage,
-                    modalState.Capacity,
-                    modalState.CapacityNoticeSent,
-                    modalState.SessionStarted,
-                    out var session)
-                || session.HostUserId != modal.User.Id)
-            {
-                await modal.RespondAsync("Only the group creator can edit the start time.", ephemeral: true);
-                return;
-            }
-
-            if (session.SessionStarted)
-            {
-                await modal.RespondAsync("This session has already been started.", ephemeral: true);
-                return;
-            }
-
-            var updatedSession = session with { StartsAtUnixTimeSeconds = startsAtUnixTimeSeconds };
-
-            await userMessage.ModifyAsync(properties =>
-            {
-                properties.Embed = GroupFinderMessageBuilder.BuildEmbed(updatedSession);
-                properties.Components = GroupFinderMessageBuilder.BuildComponents(
-                    updatedSession.Capacity,
-                    updatedSession.PlayerIds.Count,
-                    updatedSession.CapacityNoticeSent,
-                    updatedSession.SessionStarted);
-            });
-
-            await modal.RespondAsync("Start time updated.", ephemeral: true);
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "Failed to edit start time for group finder message {MessageId}.", modalState.MessageId);
-            await modal.RespondAsync("I could not update the start time.", ephemeral: true);
-        }
-    }
-    private async Task EditTimeAsync(SocketMessageComponent component, GroupFinderSession session)
-    {
-        if (component.User.Id != session.HostUserId)
-        {
-            await component.RespondAsync("Only the group creator can edit the start time.", ephemeral: true);
-            return;
-        }
-
-        if (session.SessionStarted)
-        {
-            await component.RespondAsync("This session has already been started.", ephemeral: true);
-            return;
-        }
-
-        var modal = new ModalBuilder()
-            .WithTitle("Edit start time")
-            .WithCustomId(GroupFinderButtonIds.CreateEditTimeModalId(
-                component.Message.Id,
-                session.Capacity,
-                session.CapacityNoticeSent,
-                session.SessionStarted))
-            .AddTextInput(
-                label: "Start time",
-                customId: GroupFinderMessageBuilder.StartTimeInputId,
-                style: TextInputStyle.Short,
-                placeholder: "20:00, 17.00, tomorrow 20:00, or 2026-04-28 20:00",
-                minLength: 1,
-                maxLength: 64,
-                required: true)
-            .Build();
-
-        await component.RespondWithModalAsync(modal);
-    }
-
-    private async Task ScrambleTeamsAsync(SocketMessageComponent component, GroupFinderSession session)
-    {
-        if (component.User.Id != session.HostUserId)
-        {
-            await component.RespondAsync("Only the group creator can scramble teams.", ephemeral: true);
-            return;
-        }
-
-        if (session.PlayerIds.Count < 2)
-        {
-            await component.RespondAsync("Team scrambling needs at least two registered players.", ephemeral: true);
-            return;
-        }
-
-        var teams = teamScrambler.CreateTeams(session.PlayerIds);
-
-        await UpdateGroupMessageAsync(component, session with { TeamIds = teams });
-        await component.FollowupAsync("Teams scrambled.", ephemeral: true);
-    }
-
-    private async Task ReadyCheckAsync(SocketMessageComponent component, GroupFinderSession session)
-    {
-        if (component.User.Id != session.HostUserId)
-        {
-            await component.RespondAsync("Only the group creator can start a ready check.", ephemeral: true);
-            return;
-        }
-
-        if (session.SessionStarted)
-        {
-            await component.RespondAsync("This session has already been started.", ephemeral: true);
-            return;
-        }
-
-        if (session.HasActiveReadyCheck)
-        {
-            await component.RespondAsync("This group already has an active ready check.", ephemeral: true);
-            return;
-        }
-
-        if (session.PlayerIds.Count < 2)
-        {
-            await component.RespondAsync("Ready checks need at least two registered players.", ephemeral: true);
-            return;
-        }
-
-        var modal = new ModalBuilder()
-            .WithTitle("Ready check")
-            .WithCustomId(GroupFinderButtonIds.CreateReadyCheckModalId(
-                component.Message.Id,
-                session.Capacity,
-                session.CapacityNoticeSent,
-                session.SessionStarted))
-            .AddTextInput(
-                label: "Message",
-                customId: GroupFinderMessageBuilder.ReadyCheckMessageInputId,
-                style: TextInputStyle.Paragraph,
-                placeholder: "Optional message for the group",
-                minLength: 0,
-                maxLength: GroupFinderMessageBuilder.ReadyCheckMessageMaxLength,
-                required: false)
-            .Build();
-
-        await component.RespondWithModalAsync(modal);
-    }
-
-    private async Task StartSessionAsync(SocketMessageComponent component, GroupFinderSession session)
-    {
-        if (component.User.Id != session.HostUserId)
-        {
-            await component.RespondAsync("Only the group creator can start this session.", ephemeral: true);
-            return;
-        }
-
-        if (session.SessionStarted)
-        {
-            await component.RespondAsync("This session has already been started.", ephemeral: true);
-            return;
-        }
-
-        var components = new ComponentBuilder()
-            .WithButton(
-                label: "Confirm start",
-                customId: GroupFinderButtonIds.CreateConfirmStartId(
-                    component.Message.Id,
-                    session.HostUserId,
-                    session.Capacity,
-                    session.CapacityNoticeSent,
-                    session.SessionStarted),
-                style: ButtonStyle.Primary)
-            .WithButton(
-                label: "Cancel",
-                customId: GroupFinderButtonIds.CreateCancelStartId(),
-                style: ButtonStyle.Secondary)
-            .Build();
-
-        await component.RespondAsync(
-            "This will mention all registered players in this channel.",
-            components: components,
-            ephemeral: true);
-    }
-
-    private async Task HandleStartConfirmationAsync(
-        SocketMessageComponent component,
-        GroupFinderStartConfirmation confirmation)
-    {
-        if (confirmation.Action == GroupFinderButtonAction.CancelStart)
-        {
-            await UpdateEphemeralResponseAsync(component, "Start cancelled.");
-            return;
-        }
-
-        if (component.User.Id != confirmation.HostUserId)
-        {
-            await UpdateEphemeralResponseAsync(component, "Only the group creator can start this session.");
-            return;
-        }
-
-        try
-        {
-            var message = await component.Channel.GetMessageAsync(confirmation.MessageId);
-
-            if (message is not IUserMessage userMessage)
-            {
-                await UpdateEphemeralResponseAsync(component, "That group message no longer exists.");
-                return;
-            }
-
-            if (!GroupFinderMessageBuilder.TryReadSession(
-                userMessage,
-                confirmation.Capacity,
-                confirmation.CapacityNoticeSent,
-                confirmation.SessionStarted,
-                out var session)
-                || session.HostUserId != confirmation.HostUserId)
-            {
-                await UpdateEphemeralResponseAsync(component, "I could not read that group finder message.");
-                return;
-            }
-
-            if (session.SessionStarted)
-            {
-                await UpdateEphemeralResponseAsync(component, "This session has already been started.");
-                return;
-            }
-
-            var updatedSession = session with
-            {
-                SessionStarted = true,
-                ReadyStates = new Dictionary<ulong, GroupFinderReadyState>(),
-            };
-
-            await userMessage.ModifyAsync(properties =>
-            {
-                properties.Embed = GroupFinderMessageBuilder.BuildEmbed(updatedSession);
-                properties.Components = GroupFinderMessageBuilder.BuildComponents(
-                    updatedSession.Capacity,
-                    updatedSession.PlayerIds.Count,
-                    updatedSession.CapacityNoticeSent,
-                    updatedSession.SessionStarted);
-            });
-
-            await notificationService.SendSessionStartedAsync(component.Channel, updatedSession, userMessage.Id);
-
-            await UpdateEphemeralResponseAsync(component, "Session started. Registered players have been notified.");
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(
-                exception,
-                "Failed to start group finder session for message {MessageId}.",
-                confirmation.MessageId);
-            await UpdateEphemeralResponseAsync(component, "I could not start this session.");
-        }
-    }
-
-    private async Task CloseGroupAsync(SocketMessageComponent component, GroupFinderSession session)
-    {
-        if (!CanCloseGroup(component.User, session.HostUserId))
-        {
-            await component.RespondAsync("Only the host or moderators can close this group.", ephemeral: true);
-            return;
-        }
-
-        var components = new ComponentBuilder()
-            .WithButton(
-                label: "Confirm close",
-                customId: GroupFinderButtonIds.CreateConfirmCloseId(component.Message.Id, session.HostUserId),
-                style: ButtonStyle.Danger)
-            .WithButton(
-                label: "Cancel",
-                customId: GroupFinderButtonIds.CreateCancelCloseId(),
-                style: ButtonStyle.Secondary)
-            .Build();
-
-        await component.RespondAsync(
-            "You can close this group. Confirming will delete the group finder message and related Flowbot ready/start messages.",
-            components: components,
-            ephemeral: true);
-    }
-
-    private async Task HandleReadyResponseAsync(
-        SocketMessageComponent component,
-        GroupFinderReadyResponseState readyResponse)
-    {
-        try
-        {
-            var message = await component.Channel.GetMessageAsync(readyResponse.MessageId);
-
-            if (message is not IUserMessage userMessage)
-            {
-                await component.RespondAsync("That group message no longer exists.", ephemeral: true);
-                return;
-            }
-
-            if (!GroupFinderMessageBuilder.TryReadSession(
-                    userMessage,
-                    readyResponse.Capacity,
-                    readyResponse.CapacityNoticeSent,
-                    readyResponse.SessionStarted,
-                    out var session))
-            {
-                await component.RespondAsync("I could not read that group finder message.", ephemeral: true);
-                return;
-            }
-
-            if (!session.HasActiveReadyCheck)
-            {
-                await component.RespondAsync("This group does not have an active ready check.", ephemeral: true);
-                return;
-            }
-
-            if (!session.PlayerIds.Contains(component.User.Id))
-            {
-                await component.RespondAsync("Only registered players can answer this ready check.", ephemeral: true);
-                return;
-            }
-
-            var readyState = readyResponse.Action == GroupFinderButtonAction.Ready
-                ? GroupFinderReadyState.Ready
-                : GroupFinderReadyState.NotReady;
-            var readyStates = session.ReadyStates.ToDictionary(pair => pair.Key, pair => pair.Value);
-            readyStates[component.User.Id] = readyState;
-            var updatedSession = session with { ReadyStates = readyStates };
-
-            await userMessage.ModifyAsync(properties =>
-            {
-                properties.Embed = GroupFinderMessageBuilder.BuildEmbed(updatedSession);
-                properties.Components = GroupFinderMessageBuilder.BuildComponents(
-                    updatedSession.Capacity,
-                    updatedSession.PlayerIds.Count,
-                    updatedSession.CapacityNoticeSent,
-                    updatedSession.SessionStarted);
-            });
-
-            await component.RespondAsync(
-                readyState == GroupFinderReadyState.Ready
-                    ? "You are marked ready."
-                    : "You are marked not ready.",
-                ephemeral: true);
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "Failed to update ready check for message {MessageId}.", readyResponse.MessageId);
-            await component.RespondAsync("I could not update this ready check.", ephemeral: true);
-        }
-    }
-
-    private async Task HandleCloseConfirmationAsync(
-        SocketMessageComponent component,
-        GroupFinderCloseConfirmation confirmation)
-    {
-        if (confirmation.Action == GroupFinderButtonAction.CancelClose)
-        {
-            await UpdateEphemeralResponseAsync(component, "Close cancelled.");
-            return;
-        }
-
-        if (!CanCloseGroup(component.User, confirmation.HostUserId))
-        {
-            await UpdateEphemeralResponseAsync(component, "Only the host or moderators can close this group.");
-            return;
-        }
-
-        try
-        {
-            var message = await component.Channel.GetMessageAsync(confirmation.MessageId);
-
-            if (message is null)
-            {
-                await UpdateEphemeralResponseAsync(component, "That group message no longer exists.");
-                return;
-            }
-
-            var deletedRelatedMessages = await relatedMessageCleaner.DeleteRelatedMessagesAsync(message);
-            await message.DeleteAsync();
-
-            await UpdateEphemeralResponseAsync(
-                component,
-                deletedRelatedMessages > 0
-                    ? $"Group closed. Deleted {deletedRelatedMessages} related Flowbot message{(deletedRelatedMessages == 1 ? string.Empty : "s")}."
-                    : "Group closed.");
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(
-                exception,
-                "Failed to delete group finder message {MessageId}.",
-                confirmation.MessageId);
-            await UpdateEphemeralResponseAsync(component, "I could not delete this group message.");
-        }
-    }
-
-    private static bool CanCloseGroup(SocketUser user, ulong hostUserId)
-    {
-        if (user.Id == hostUserId)
-        {
-            return true;
-        }
-
-        return user is SocketGuildUser guildUser
-            && (guildUser.GuildPermissions.Administrator
-                || guildUser.GuildPermissions.ManageMessages);
-    }
-
     private async Task UpdateGroupMessageAsync(SocketMessageComponent component, GroupFinderSession session)
     {
         try
@@ -652,16 +158,12 @@ public sealed class GroupFinderButtonHandler(
             await component.UpdateAsync(properties =>
             {
                 properties.Embed = GroupFinderMessageBuilder.BuildEmbed(session);
-                properties.Components = GroupFinderMessageBuilder.BuildComponents(
-                    session.Capacity,
-                    session.PlayerIds.Count,
-                    session.CapacityNoticeSent,
-                    session.SessionStarted);
+                properties.Components = GroupFinderMessageBuilder.BuildComponents(session);
             });
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Failed to update group finder message {MessageId}.", component.Message.Id);
+            _logger.LogWarning(exception, "Failed to update group finder message {MessageId}.", component.Message.Id);
             await component.RespondAsync("I could not update this group message.", ephemeral: true);
         }
     }

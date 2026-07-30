@@ -4,7 +4,7 @@ namespace FlowBot;
 
 public sealed class PingModule : InteractionModuleBase<SocketInteractionContext>
 {
-    [SlashCommand("ping", "Checks whether FlowBot is awake.")]
+    [SlashCommand("ping", "Checks whether Flowbot is awake.")]
     public async Task PingAsync()
     {
         await RespondAsync("Pong!", ephemeral: true);

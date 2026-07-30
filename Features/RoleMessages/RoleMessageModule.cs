@@ -12,7 +12,7 @@ public sealed class RoleMessageModule : InteractionModuleBase<SocketInteractionC
     [RequireBotPermission(GuildPermission.ManageRoles)]
     public async Task CreateRoleMessageAsync(
         [Summary("role", "The role users will receive when they click the button.")] SocketRole role,
-        [Summary("message", "The message FlowBot should post above the button.")] string message = "Click the button below to receive this role.")
+        [Summary("message", "The message Flowbot should post above the button.")][MaxLength(4096)] string message = "Click the button below to receive this role.")
     {
         if (role.IsEveryone)
         {
@@ -29,7 +29,7 @@ public sealed class RoleMessageModule : InteractionModuleBase<SocketInteractionC
         if (role.Position >= Context.Guild.CurrentUser.Hierarchy)
         {
             await RespondAsync(
-                $"I cannot assign {role.Mention} because it is at or above my highest role. Move FlowBot's role above it and try again.",
+                $"I cannot assign {role.Mention} because it is at or above my highest role. Move Flowbot's role above it and try again.",
                 ephemeral: true);
             return;
         }

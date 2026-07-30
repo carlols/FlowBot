@@ -65,7 +65,7 @@ public sealed class RaidVoiceSplitHandler(ILogger<RaidVoiceSplitHandler> logger)
             if (!targetPermissions.Connect || !targetPermissions.MoveMembers)
             {
                 await component.RespondAsync(
-                    $"FlowBot needs `Connect` and `Move Members` in {targetChannel.Mention} before it can move users there.",
+                    $"Flowbot needs `Connect` and `Move Members` in {targetChannel.Mention} before it can move users there.",
                     ephemeral: true);
                 return;
             }

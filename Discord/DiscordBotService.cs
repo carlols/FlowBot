@@ -9,11 +9,7 @@ namespace FlowBot;
 public sealed class DiscordBotService(
     DiscordSocketClient client,
     InteractionService interactions,
-    RoleButtonHandler roleButtonHandler,
-    GroupFinderButtonHandler groupFinderButtonHandler,
-    PullCountGuessHandler pullCountGuessHandler,
-    EmojiImportHandler emojiImportHandler,
-    RaidVoiceSplitHandler raidVoiceSplitHandler,
+    DiscordInteractionRouter interactionRouter,
     IServiceProvider services,
     IOptions<FlowBotOptions> options,
     IHostApplicationLifetime lifetime,
@@ -35,7 +31,7 @@ public sealed class DiscordBotService(
         interactions.Log += LogDiscordMessageAsync;
         client.Ready += HandleReadyAsync;
         client.JoinedGuild += HandleJoinedGuildAsync;
-        client.InteractionCreated += HandleInteractionAsync;
+        client.InteractionCreated += interactionRouter.RouteAsync;
 
         await interactions.AddModulesAsync(Assembly.GetExecutingAssembly(), services);
         await client.LoginAsync(TokenType.Bot, _options.Token);
@@ -53,7 +49,7 @@ public sealed class DiscordBotService(
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        client.InteractionCreated -= HandleInteractionAsync;
+        client.InteractionCreated -= interactionRouter.RouteAsync;
         client.JoinedGuild -= HandleJoinedGuildAsync;
         client.Ready -= HandleReadyAsync;
         interactions.Log -= LogDiscordMessageAsync;
@@ -162,73 +158,6 @@ public sealed class DiscordBotService(
     {
         await interactions.RegisterCommandsToGuildAsync(guildId);
         logger.LogInformation("Registered slash commands to allowed server {ServerId}.", guildId);
-    }
-
-    private async Task HandleInteractionAsync(SocketInteraction interaction)
-    {
-        if (interaction is SocketMessageComponent component
-            && RoleButtonIds.IsRoleButton(component.Data.CustomId))
-        {
-            await roleButtonHandler.HandleAsync(component);
-            return;
-        }
-
-        if (interaction is SocketMessageComponent groupFinderComponent
-            && GroupFinderButtonIds.IsGroupFinderButton(groupFinderComponent.Data.CustomId))
-        {
-            await groupFinderButtonHandler.HandleAsync(groupFinderComponent);
-            return;
-        }
-
-        if (interaction is SocketModal groupFinderModal
-            && GroupFinderButtonIds.IsGroupFinderButton(groupFinderModal.Data.CustomId))
-        {
-            await groupFinderButtonHandler.HandleModalAsync(groupFinderModal);
-            return;
-        }
-
-        if (interaction is SocketMessageComponent pullCountComponent
-            && PullCountGuessIds.IsPullCountGuessInteraction(pullCountComponent.Data.CustomId))
-        {
-            await pullCountGuessHandler.HandleComponentAsync(pullCountComponent);
-            return;
-        }
-
-        if (interaction is SocketMessageComponent emojiImportComponent
-            && EmojiImportIds.IsEmojiImportInteraction(emojiImportComponent.Data.CustomId))
-        {
-            await emojiImportHandler.HandleComponentAsync(emojiImportComponent);
-            return;
-        }
-
-        if (interaction is SocketMessageComponent raidVoiceSplitComponent
-            && RaidVoiceSplitButtonIds.IsRaidVoiceSplitButton(raidVoiceSplitComponent.Data.CustomId))
-        {
-            await raidVoiceSplitHandler.HandleAsync(raidVoiceSplitComponent);
-            return;
-        }
-
-        if (interaction is SocketModal pullCountModal
-            && PullCountGuessIds.IsPullCountGuessInteraction(pullCountModal.Data.CustomId))
-        {
-            await pullCountGuessHandler.HandleModalAsync(pullCountModal);
-            return;
-        }
-
-        if (interaction is SocketModal emojiImportModal
-            && EmojiImportIds.IsEmojiImportInteraction(emojiImportModal.Data.CustomId))
-        {
-            await emojiImportHandler.HandleModalAsync(emojiImportModal);
-            return;
-        }
-
-        var context = new SocketInteractionContext(client, interaction);
-        var result = await interactions.ExecuteCommandAsync(context, services);
-
-        if (!result.IsSuccess)
-        {
-            logger.LogWarning("Interaction failed: {Error} {Reason}", result.Error, result.ErrorReason);
-        }
     }
 
     private Task LogDiscordMessageAsync(LogMessage message)

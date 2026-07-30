@@ -7,7 +7,7 @@ public static class EmojiImportPermissions
     public const string ImportRoleName = "Big Lord";
 
     public static string DeniedMessage =>
-        $"Only the server owner or members with the `{ImportRoleName}` role can import emojis with FlowBot.";
+        $"Only the server owner or members with the `{ImportRoleName}` role can import emojis with Flowbot.";
 
     public static bool CanImportEmojis(SocketGuild guild, SocketUser user)
     {

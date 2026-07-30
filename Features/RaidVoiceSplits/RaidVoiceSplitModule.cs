@@ -56,7 +56,7 @@ public sealed class RaidVoiceSplitModule : InteractionModuleBase<SocketInteracti
             return true;
         }
 
-        errorMessage = $"FlowBot needs `Connect` and `Move Members` in {channel.Mention} before it can move users there.";
+        errorMessage = $"Flowbot needs `Connect` and `Move Members` in {channel.Mention} before it can move users there.";
         return false;
     }
 }

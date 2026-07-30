@@ -34,21 +34,28 @@ public static partial class PullCountGuessMessageBuilder
             return embed.Build();
         }
 
-        foreach (var chunk in orderedGuesses.Chunk(GuessesPerField))
+        for (var offset = 0; offset < orderedGuesses.Length; offset += GuessesPerField)
         {
-            var start = Array.IndexOf(orderedGuesses, chunk[0]) + 1;
-            var end = start + chunk.Length - 1;
+            var chunk = orderedGuesses
+                .Skip(offset)
+                .Take(GuessesPerField)
+                .ToArray();
+            var firstPosition = offset + 1;
+            var lastPosition = offset + chunk.Length;
             var value = string.Join(
                 Environment.NewLine,
-                chunk.Select((guess, index) => $"{start + index}. <@{guess.UserId}> - {guess.PullCount}"));
+                chunk.Select((guess, index) =>
+                    $"{firstPosition + index}. <@{guess.UserId}> - {guess.PullCount}"));
 
-            embed.AddField($"Guesses {start}-{end}", value);
+            embed.AddField($"Guesses {firstPosition}-{lastPosition}", value);
         }
-
         return embed.Build();
     }
 
-    public static MessageComponent BuildComponents(bool isClosed)
+    public static MessageComponent BuildComponents(PullCountGuessSession session) =>
+        BuildComponents(session.IsClosed);
+
+    private static MessageComponent BuildComponents(bool isClosed)
     {
         return new ComponentBuilder()
             .WithButton(

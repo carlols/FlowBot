@@ -9,13 +9,18 @@ public sealed class PullCountGuessModule : InteractionModuleBase<SocketInteracti
     [RequireContext(ContextType.Guild)]
     [RequireUserPermission(GuildPermission.Administrator)]
     public async Task CreatePullCountGuessBoardAsync(
-        [Summary("boss-name", "Boss name shown on the guessing board.")] string bossName)
+        [Summary("boss-name", "Boss name shown on the guessing board.")][MinLength(1)][MaxLength(PullCountGuessSession.MaxBossNameLength)] string bossName)
     {
+        if (string.IsNullOrWhiteSpace(bossName))
+        {
+            await RespondAsync("Please provide a boss name.", ephemeral: true);
+            return;
+        }
         var session = PullCountGuessSession.Create(bossName);
 
         await RespondAsync("Pull-count guessing board created.", ephemeral: true);
         await Context.Channel.SendMessageAsync(
             embed: PullCountGuessMessageBuilder.BuildEmbed(session),
-            components: PullCountGuessMessageBuilder.BuildComponents(session.IsClosed));
+            components: PullCountGuessMessageBuilder.BuildComponents(session));
     }
 }

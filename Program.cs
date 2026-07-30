@@ -38,6 +38,7 @@ builder.Services.AddSingleton<EmojiImportHandler>();
 builder.Services.AddSingleton<EmojiImageOptimizer>();
 builder.Services.AddSingleton<SevenTvEmojiService>();
 builder.Services.AddSingleton<RaidVoiceSplitHandler>();
+builder.Services.AddSingleton<DiscordInteractionRouter>();
 builder.Services.AddHostedService<DiscordBotService>();
 
 var host = builder.Build();

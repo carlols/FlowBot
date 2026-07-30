@@ -5,11 +5,11 @@ namespace FlowBot;
 
 public sealed class HelpModule : InteractionModuleBase<SocketInteractionContext>
 {
-    [SlashCommand("help", "Shows what FlowBot can do.")]
+    [SlashCommand("help", "Shows what Flowbot can do.")]
     public async Task HelpAsync()
     {
         var embed = new EmbedBuilder()
-            .WithTitle("FlowBot help")
+            .WithTitle("Flowbot help")
             .WithDescription("A quick guide to the commands available in this server.")
             .WithColor(new Color(88, 166, 255))
             .AddField(
@@ -35,8 +35,8 @@ public sealed class HelpModule : InteractionModuleBase<SocketInteractionContext>
                 "Admins can create a message that lets members add or remove a server role from themselves.")
             .AddField(
                 "/ping",
-                "Checks whether FlowBot is awake.")
-            .WithFooter("Most FlowBot responses to setup and help commands are private to you.")
+                "Checks whether Flowbot is awake.")
+            .WithFooter("Most Flowbot responses to setup and help commands are private to you.")
             .Build();
 
         await RespondAsync(embed: embed, ephemeral: true);
