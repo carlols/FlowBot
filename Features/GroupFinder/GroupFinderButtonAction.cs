@@ -7,6 +7,7 @@ public enum GroupFinderButtonAction
     ReadyCheck,
     EditTime,
     ScrambleTeams,
+    MovePlayers,
     Ready,
     NotReady,
     Start,
