@@ -23,7 +23,9 @@ public static class GroupFinderMessageBuilder
             .AddField(StatusFieldName, FormatStatus(session), inline: true)
             .AddField(HostFieldName, $"<@{session.HostUserId}>", inline: true)
             .WithColor(new Color(87, 242, 135))
-            .WithFooter("The group creator can start the session when everyone is ready.");
+            .WithFooter(session.SessionStarted
+                ? "Session started by the group creator."
+                : "The group creator can start the session when everyone is ready.");
 
         if (session.StartsAtUnixTimeSeconds is { } startsAt)
         {
