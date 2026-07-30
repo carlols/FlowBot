@@ -9,6 +9,8 @@ public static partial class GroupFinderButtonIds
     private const string EditTimePrefix = "flowbot-group-edit-time:";
     private const string EditTimeModalPrefix = "flowbot-group-edit-time-modal:";
     private const string ScrambleTeamsPrefix = "flowbot-group-scramble-teams:";
+    private const string MovePlayersPrefix = "flowbot-group-move-players:";
+    private const string VoiceChannelSelectPrefix = "flowbot-group-voice-select:";
     private const string ReadyPrefix = "flowbot-group-ready:";
     private const string NotReadyPrefix = "flowbot-group-not-ready:";
     private const string StartPrefix = "flowbot-group-start:";
@@ -40,6 +42,12 @@ public static partial class GroupFinderButtonIds
 
     public static string CreateScrambleTeamsId(int? capacity, bool capacityNoticeSent, bool sessionStarted) =>
         $"{ScrambleTeamsPrefix}{FormatCapacity(capacity)}:{FormatState(capacityNoticeSent)}:{FormatState(sessionStarted)}";
+
+    public static string CreateMovePlayersId(int? capacity, bool capacityNoticeSent, bool sessionStarted) =>
+        $"{MovePlayersPrefix}{FormatCapacity(capacity)}:{FormatState(capacityNoticeSent)}:{FormatState(sessionStarted)}";
+
+    public static string CreateVoiceChannelSelectId(ulong messageId) =>
+        $"{VoiceChannelSelectPrefix}{messageId}";
 
     public static string CreateEditTimeModalId(
         ulong messageId,
@@ -91,6 +99,8 @@ public static partial class GroupFinderButtonIds
         || customId.StartsWith(EditTimePrefix, StringComparison.Ordinal)
         || customId.StartsWith(EditTimeModalPrefix, StringComparison.Ordinal)
         || customId.StartsWith(ScrambleTeamsPrefix, StringComparison.Ordinal)
+        || customId.StartsWith(MovePlayersPrefix, StringComparison.Ordinal)
+        || customId.StartsWith(VoiceChannelSelectPrefix, StringComparison.Ordinal)
         || customId.StartsWith(ReadyPrefix, StringComparison.Ordinal)
         || customId.StartsWith(NotReadyPrefix, StringComparison.Ordinal)
         || customId.StartsWith(StartPrefix, StringComparison.Ordinal)

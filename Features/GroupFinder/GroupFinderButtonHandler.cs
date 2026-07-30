@@ -10,6 +10,7 @@ public sealed partial class GroupFinderButtonHandler
     private readonly GroupFinderRelatedMessageCleaner _relatedMessageCleaner;
     private readonly GroupFinderTimeParser _timeParser;
     private readonly GroupFinderTeamScrambler _teamScrambler;
+    private readonly VoiceMemberMover _voiceMemberMover;
     private readonly ILogger<GroupFinderButtonHandler> _logger;
 
     public GroupFinderButtonHandler(
@@ -18,6 +19,7 @@ public sealed partial class GroupFinderButtonHandler
         GroupFinderRelatedMessageCleaner relatedMessageCleaner,
         GroupFinderTimeParser timeParser,
         GroupFinderTeamScrambler teamScrambler,
+        VoiceMemberMover voiceMemberMover,
         ILogger<GroupFinderButtonHandler> logger)
     {
         _messageMutationLock = messageMutationLock;
@@ -25,11 +27,18 @@ public sealed partial class GroupFinderButtonHandler
         _relatedMessageCleaner = relatedMessageCleaner;
         _timeParser = timeParser;
         _teamScrambler = teamScrambler;
+        _voiceMemberMover = voiceMemberMover;
         _logger = logger;
     }
 
     public async Task HandleAsync(SocketMessageComponent component)
     {
+        if (GroupFinderButtonIds.TryParseVoiceChannelSelect(component.Data.CustomId, out var groupMessageId))
+        {
+            await HandleVoiceChannelSelectionAsync(component, groupMessageId);
+            return;
+        }
+
         if (GroupFinderButtonIds.TryParseReadyResponse(component.Data.CustomId, out var readyResponse))
         {
             await HandleReadyResponseAsync(component, readyResponse);
@@ -90,6 +99,9 @@ public sealed partial class GroupFinderButtonHandler
                 break;
             case GroupFinderButtonAction.EditTime:
                 await EditTimeAsync(component, session);
+                break;
+            case GroupFinderButtonAction.MovePlayers:
+                await MovePlayersAsync(component, session);
                 break;
             default:
                 await component.RespondAsync("I could not identify this group finder action.", ephemeral: true);

@@ -182,7 +182,7 @@ Group finder lives in `Features/GroupFinder`.
 - host
 - player list
 - optional team assignments
-- join, leave, ready check, scramble teams, start, edit time, and close buttons
+- join, leave, ready check, scramble teams, start, move players, edit time, and close buttons
 
 The creator is automatically player 1.
 
@@ -206,6 +206,8 @@ When someone clicks `Join`, `GroupFinderButtonHandler`:
 8. Edits the original Discord message.
 
 When the creator clicks `Scramble Teams`, `GroupFinderButtonHandler` reads the current player list, randomizes it into two teams, and edits the same group message. Because the team list is stored in the embed, the teams can be scrambled again after a restart.
+
+When the creator or a server administrator clicks `Move Players`, Flowbot responds with a private voice-channel picker. After a destination is selected, the handler refetches the group message, reads the latest registered player list, finds which players are connected to voice, and delegates their concurrent moves to `VoiceMemberMover`. The selected channel is not stored in the group message.
 
 The close flow is two-step:
 

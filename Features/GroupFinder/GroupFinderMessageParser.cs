@@ -30,6 +30,7 @@ public static partial class GroupFinderMessageParser
             buttonState.SessionStarted,
             out session);
     }
+
     public static bool TryReadSession(
         IMessage message,
         int? capacity,

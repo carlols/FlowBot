@@ -34,7 +34,20 @@ public static partial class GroupFinderButtonIds
             return true;
         }
 
+        if (TryParse(customId, MovePlayersPrefix, GroupFinderButtonAction.MovePlayers, out state))
+        {
+            return true;
+        }
+
         return TryParse(customId, ClosePrefix, GroupFinderButtonAction.Close, out state);
+    }
+
+    public static bool TryParseVoiceChannelSelect(string customId, out ulong messageId)
+    {
+        messageId = 0;
+
+        return customId.StartsWith(VoiceChannelSelectPrefix, StringComparison.Ordinal)
+            && ulong.TryParse(customId[VoiceChannelSelectPrefix.Length..], out messageId);
     }
 
     public static bool TryParseReadyCheckModal(string customId, out GroupFinderReadyCheckModalState state)

@@ -89,6 +89,11 @@ public static class GroupFinderMessageBuilder
                 style: ButtonStyle.Secondary,
                 disabled: sessionStarted,
                 row: 1)
+            .WithButton(
+                label: "Move Players",
+                customId: GroupFinderButtonIds.CreateMovePlayersId(capacity, capacityNoticeSent, sessionStarted),
+                style: ButtonStyle.Secondary,
+                row: 1)
             .Build();
     }
 
