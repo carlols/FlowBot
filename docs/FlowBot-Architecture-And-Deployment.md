@@ -124,6 +124,18 @@ That is what invokes command methods such as:
 public async Task PingAsync()
 ```
 
+### Concurrent message updates
+
+Interactive features such as group finder and pull-count guessing store their current state in the Discord message itself. A state-changing click therefore follows this sequence:
+
+1. Acknowledge the interaction immediately.
+2. Acquire a process-local lock for that message ID.
+3. Fetch and parse the latest version of the message from Discord.
+4. Apply the requested change and update the message.
+5. Release the lock so the next queued click can continue.
+
+Different messages can still update in parallel. This prevents nearly simultaneous clicks on one message from overwriting each other, provided exactly one Flowbot process is connected with the bot token. Stop the Fly machine before running Flowbot locally; multiple active processes would need a shared database or distributed lock to coordinate safely.
+
 ## 6. Feature Structure
 
 FlowBot is organized by feature and infrastructure:

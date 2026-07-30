@@ -76,6 +76,26 @@ public static partial class PullCountGuessMessageBuilder
             .Build();
     }
 
+    public static bool TryReadSession(IUserMessage message, out PullCountGuessSession session)
+    {
+        var buttonState = message.Components
+            .OfType<ActionRowComponent>()
+            .SelectMany(row => row.Components)
+            .OfType<ButtonComponent>()
+            .Select(button => button.CustomId ?? string.Empty)
+            .Select(customId => PullCountGuessIds.TryParseButton(customId, out var state)
+                ? state
+                : null)
+            .FirstOrDefault(state => state is not null);
+
+        if (buttonState is null)
+        {
+            session = default!;
+            return false;
+        }
+
+        return TryReadSession(message, buttonState.IsClosed, out session);
+    }
     public static bool TryReadSession(
         IMessage message,
         bool isClosed,

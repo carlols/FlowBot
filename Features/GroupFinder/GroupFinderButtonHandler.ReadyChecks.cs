@@ -25,63 +25,58 @@ public sealed partial class GroupFinderButtonHandler
             return;
         }
 
+        await modal.DeferAsync(ephemeral: true);
+
         try
         {
-            var originalMessage = await modal.Channel.GetMessageAsync(modalState.MessageId);
-
-            if (originalMessage is not IUserMessage userMessage)
+            using (await _messageMutationLock.AcquireAsync(modalState.MessageId))
             {
-                await modal.RespondAsync("That group message no longer exists.", ephemeral: true);
-                return;
+                var current = await LoadCurrentSessionAsync(modal.Channel, modalState.MessageId);
+                if (current is null)
+                {
+                    await modal.FollowupAsync("That group message no longer exists.", ephemeral: true);
+                    return;
+                }
+
+                var (userMessage, session) = current.Value;
+
+                if (session.HostUserId != modal.User.Id)
+                {
+                    await modal.FollowupAsync("Only the group creator can start a ready check.", ephemeral: true);
+                    return;
+                }
+
+                if (session.HasActiveReadyCheck)
+                {
+                    await modal.FollowupAsync("This group already has an active ready check.", ephemeral: true);
+                    return;
+                }
+
+                if (session.PlayerIds.Count < 2)
+                {
+                    await modal.FollowupAsync("Ready checks need at least two registered players.", ephemeral: true);
+                    return;
+                }
+
+                var readyStates = session.PlayerIds.ToDictionary(
+                    playerId => playerId,
+                    _ => GroupFinderReadyState.Waiting);
+                var updatedSession = session with { ReadyStates = readyStates };
+
+                await UpdateGroupMessageAsync(userMessage, updatedSession);
+                await _notificationService.SendReadyCheckAsync(
+                    modal.Channel,
+                    updatedSession,
+                    userMessage.Id,
+                    message);
             }
 
-            if (!GroupFinderMessageParser.TryReadSession(
-                    userMessage,
-                    modalState.Capacity,
-                    modalState.CapacityNoticeSent,
-                    modalState.SessionStarted,
-                    out var session)
-                || session.HostUserId != modal.User.Id)
-            {
-                await modal.RespondAsync("Only the group creator can start a ready check.", ephemeral: true);
-                return;
-            }
-
-            if (session.HasActiveReadyCheck)
-            {
-                await modal.RespondAsync("This group already has an active ready check.", ephemeral: true);
-                return;
-            }
-
-            if (session.PlayerIds.Count < 2)
-            {
-                await modal.RespondAsync("Ready checks need at least two registered players.", ephemeral: true);
-                return;
-            }
-
-            var readyStates = session.PlayerIds.ToDictionary(
-                playerId => playerId,
-                _ => GroupFinderReadyState.Waiting);
-            var updatedSession = session with { ReadyStates = readyStates };
-
-            await userMessage.ModifyAsync(properties =>
-            {
-                properties.Embed = GroupFinderMessageBuilder.BuildEmbed(updatedSession);
-                properties.Components = GroupFinderMessageBuilder.BuildComponents(updatedSession);
-            });
-
-            await _notificationService.SendReadyCheckAsync(
-                modal.Channel,
-                updatedSession,
-                userMessage.Id,
-                message);
-
-            await modal.RespondAsync("Ready check sent.", ephemeral: true);
+            await modal.FollowupAsync("Ready check sent.", ephemeral: true);
         }
         catch (Exception exception)
         {
             _logger.LogWarning(exception, "Failed to start ready check for message {MessageId}.", modalState.MessageId);
-            await modal.RespondAsync("I could not start this ready check.", ephemeral: true);
+            await modal.FollowupAsync("I could not start this ready check.", ephemeral: true);
         }
     }
 
@@ -135,53 +130,45 @@ public sealed partial class GroupFinderButtonHandler
         SocketMessageComponent component,
         GroupFinderReadyResponseState readyResponse)
     {
+        await component.DeferAsync(ephemeral: true);
+
         try
         {
-            var message = await component.Channel.GetMessageAsync(readyResponse.MessageId);
+            GroupFinderReadyState readyState;
 
-            if (message is not IUserMessage userMessage)
+            using (await _messageMutationLock.AcquireAsync(readyResponse.MessageId))
             {
-                await component.RespondAsync("That group message no longer exists.", ephemeral: true);
-                return;
+                var current = await LoadCurrentSessionAsync(component.Channel, readyResponse.MessageId);
+                if (current is null)
+                {
+                    await component.FollowupAsync("That group message no longer exists.", ephemeral: true);
+                    return;
+                }
+
+                var (userMessage, session) = current.Value;
+
+                if (!session.HasActiveReadyCheck)
+                {
+                    await component.FollowupAsync("This group does not have an active ready check.", ephemeral: true);
+                    return;
+                }
+
+                if (!session.PlayerIds.Contains(component.User.Id))
+                {
+                    await component.FollowupAsync("Only registered players can answer this ready check.", ephemeral: true);
+                    return;
+                }
+
+                readyState = readyResponse.Action == GroupFinderButtonAction.Ready
+                    ? GroupFinderReadyState.Ready
+                    : GroupFinderReadyState.NotReady;
+                var readyStates = session.ReadyStates.ToDictionary(pair => pair.Key, pair => pair.Value);
+                readyStates[component.User.Id] = readyState;
+
+                await UpdateGroupMessageAsync(userMessage, session with { ReadyStates = readyStates });
             }
 
-            if (!GroupFinderMessageParser.TryReadSession(
-                    userMessage,
-                    readyResponse.Capacity,
-                    readyResponse.CapacityNoticeSent,
-                    readyResponse.SessionStarted,
-                    out var session))
-            {
-                await component.RespondAsync("I could not read that group finder message.", ephemeral: true);
-                return;
-            }
-
-            if (!session.HasActiveReadyCheck)
-            {
-                await component.RespondAsync("This group does not have an active ready check.", ephemeral: true);
-                return;
-            }
-
-            if (!session.PlayerIds.Contains(component.User.Id))
-            {
-                await component.RespondAsync("Only registered players can answer this ready check.", ephemeral: true);
-                return;
-            }
-
-            var readyState = readyResponse.Action == GroupFinderButtonAction.Ready
-                ? GroupFinderReadyState.Ready
-                : GroupFinderReadyState.NotReady;
-            var readyStates = session.ReadyStates.ToDictionary(pair => pair.Key, pair => pair.Value);
-            readyStates[component.User.Id] = readyState;
-            var updatedSession = session with { ReadyStates = readyStates };
-
-            await userMessage.ModifyAsync(properties =>
-            {
-                properties.Embed = GroupFinderMessageBuilder.BuildEmbed(updatedSession);
-                properties.Components = GroupFinderMessageBuilder.BuildComponents(updatedSession);
-            });
-
-            await component.RespondAsync(
+            await component.FollowupAsync(
                 readyState == GroupFinderReadyState.Ready
                     ? "You are marked ready."
                     : "You are marked not ready.",
@@ -190,8 +177,7 @@ public sealed partial class GroupFinderButtonHandler
         catch (Exception exception)
         {
             _logger.LogWarning(exception, "Failed to update ready check for message {MessageId}.", readyResponse.MessageId);
-            await component.RespondAsync("I could not update this ready check.", ephemeral: true);
+            await component.FollowupAsync("I could not update this ready check.", ephemeral: true);
         }
     }
-
 }
