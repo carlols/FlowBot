@@ -10,7 +10,7 @@ public sealed class DiscordInteractionRouter(
     GroupFinderButtonHandler groupFinderButtonHandler,
     PullCountGuessHandler pullCountGuessHandler,
     EmojiImportHandler emojiImportHandler,
-    RaidVoiceSplitHandler raidVoiceSplitHandler,
+    RoleVoiceMoveHandler roleVoiceMoveHandler,
     IServiceProvider services,
     ILogger<DiscordInteractionRouter> logger)
 {
@@ -42,9 +42,9 @@ public sealed class DiscordInteractionRouter(
                 return;
             }
 
-            if (RaidVoiceSplitButtonIds.IsRaidVoiceSplitButton(component.Data.CustomId))
+            if (RoleVoiceMoveButtonIds.IsRoleVoiceMoveButton(component.Data.CustomId))
             {
-                await raidVoiceSplitHandler.HandleAsync(component);
+                await roleVoiceMoveHandler.HandleAsync(component);
                 return;
             }
         }
