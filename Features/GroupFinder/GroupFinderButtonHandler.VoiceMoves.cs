@@ -65,7 +65,7 @@ public sealed partial class GroupFinderButtonHandler
         {
             var groupMessage = await component.Channel.GetMessageAsync(groupMessageId, CacheMode.AllowDownload);
             if (groupMessage is not IUserMessage userMessage
-                || !TryReadCurrentSession(userMessage, out var session))
+                || !GroupFinderMessageParser.TryReadSession(userMessage, out var session))
             {
                 await ModifyPickerResponseAsync(component, "That group message no longer exists.");
                 return;
@@ -118,28 +118,6 @@ public sealed partial class GroupFinderButtonHandler
                 groupMessageId);
             await ModifyPickerResponseAsync(component, "I could not move this group's players.");
         }
-    }
-
-    private static bool TryReadCurrentSession(IUserMessage message, out GroupFinderSession session)
-    {
-        foreach (var button in message.Components
-            .OfType<ActionRowComponent>()
-            .SelectMany(row => row.Components)
-            .OfType<ButtonComponent>())
-        {
-            if (GroupFinderButtonIds.TryParse(button.CustomId ?? string.Empty, out var state))
-            {
-                return GroupFinderMessageParser.TryReadSession(
-                    message,
-                    state.Capacity,
-                    state.CapacityNoticeSent,
-                    state.SessionStarted,
-                    out session);
-            }
-        }
-
-        session = default!;
-        return false;
     }
 
     private static bool CanMovePlayers(SocketUser user, ulong hostUserId) =>

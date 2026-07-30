@@ -3,7 +3,9 @@ using Discord.WebSocket;
 
 namespace FlowBot;
 
-public sealed class PullCountGuessHandler(ILogger<PullCountGuessHandler> logger)
+public sealed class PullCountGuessHandler(
+    DiscordMessageMutationLock messageMutationLock,
+    ILogger<PullCountGuessHandler> logger)
 {
     public async Task HandleComponentAsync(SocketMessageComponent component)
     {
@@ -34,19 +36,18 @@ public sealed class PullCountGuessHandler(ILogger<PullCountGuessHandler> logger)
             return;
         }
 
-        if (buttonState.Action == PullCountGuessButtonAction.AddOrUpdate)
+        switch (buttonState.Action)
         {
-            await ShowGuessModalAsync(component);
-            return;
+            case PullCountGuessButtonAction.AddOrUpdate:
+                await ShowGuessModalAsync(component);
+                break;
+            case PullCountGuessButtonAction.Remove:
+                await RemoveGuessAsync(component);
+                break;
+            default:
+                await CloseBoardAsync(component);
+                break;
         }
-
-        if (buttonState.Action == PullCountGuessButtonAction.Remove)
-        {
-            await RemoveGuessAsync(component, session);
-            return;
-        }
-
-        await CloseBoardAsync(component);
     }
 
     public async Task HandleModalAsync(SocketModal modal)
@@ -69,41 +70,37 @@ public sealed class PullCountGuessHandler(ILogger<PullCountGuessHandler> logger)
             return;
         }
 
+        await modal.DeferAsync(ephemeral: true);
+
         try
         {
-            var message = await modal.Channel.GetMessageAsync(modalState.MessageId);
-
-            if (message is not IUserMessage userMessage)
+            using (await messageMutationLock.AcquireAsync(modalState.MessageId))
             {
-                await modal.RespondAsync("That guessing board no longer exists.", ephemeral: true);
-                return;
+                var current = await LoadCurrentBoardAsync(modal.Channel, modalState.MessageId);
+                if (current is null)
+                {
+                    await modal.FollowupAsync("That guessing board no longer exists.", ephemeral: true);
+                    return;
+                }
+
+                var (userMessage, session) = current.Value;
+
+                if (session.IsClosed)
+                {
+                    await modal.FollowupAsync("Guessing is closed for this board.", ephemeral: true);
+                    return;
+                }
+
+                var guesses = session.Guesses
+                    .Where(guess => guess.UserId != modal.User.Id)
+                    .Append(new PullCountGuess(modal.User.Id, pullCount))
+                    .ToArray();
+                var updatedSession = session with { Guesses = guesses };
+
+                await UpdateBoardAsync(userMessage, updatedSession);
             }
 
-            if (!PullCountGuessMessageBuilder.TryReadSession(userMessage, isClosed: false, out var session))
-            {
-                await modal.RespondAsync("I could not read that guessing board.", ephemeral: true);
-                return;
-            }
-
-            if (session.IsClosed)
-            {
-                await modal.RespondAsync("Guessing is closed for this board.", ephemeral: true);
-                return;
-            }
-
-            var guesses = session.Guesses
-                .Where(guess => guess.UserId != modal.User.Id)
-                .Append(new PullCountGuess(modal.User.Id, pullCount))
-                .ToArray();
-            var updatedSession = session with { Guesses = guesses };
-
-            await userMessage.ModifyAsync(properties =>
-            {
-                properties.Embed = PullCountGuessMessageBuilder.BuildEmbed(updatedSession);
-                properties.Components = PullCountGuessMessageBuilder.BuildComponents(updatedSession);
-            });
-
-            await modal.RespondAsync($"Your guess is now {pullCount}.", ephemeral: true);
+            await modal.FollowupAsync($"Your guess is now {pullCount}.", ephemeral: true);
         }
         catch (Exception exception)
         {
@@ -111,11 +108,11 @@ public sealed class PullCountGuessHandler(ILogger<PullCountGuessHandler> logger)
                 exception,
                 "Failed to update pull-count guessing board {MessageId}.",
                 modalState.MessageId);
-            await modal.RespondAsync("I could not update this guessing board.", ephemeral: true);
+            await modal.FollowupAsync("I could not update this guessing board.", ephemeral: true);
         }
     }
 
-    private static async Task ShowGuessModalAsync(SocketMessageComponent component)
+    private static Task ShowGuessModalAsync(SocketMessageComponent component)
     {
         var modal = new ModalBuilder()
             .WithTitle("Add pull-count guess")
@@ -130,32 +127,58 @@ public sealed class PullCountGuessHandler(ILogger<PullCountGuessHandler> logger)
                 required: true)
             .Build();
 
-        await component.RespondWithModalAsync(modal);
+        return component.RespondWithModalAsync(modal);
     }
 
-    private static async Task RemoveGuessAsync(
-        SocketMessageComponent component,
-        PullCountGuessSession session)
+    private async Task RemoveGuessAsync(SocketMessageComponent component)
     {
-        if (!session.Guesses.Any(guess => guess.UserId == component.User.Id))
+        await component.DeferAsync(ephemeral: true);
+
+        try
         {
-            await component.RespondAsync("You do not have a guess on this board.", ephemeral: true);
-            return;
+            using (await messageMutationLock.AcquireAsync(component.Message.Id))
+            {
+                var current = await LoadCurrentBoardAsync(component.Channel, component.Message.Id);
+                if (current is null)
+                {
+                    await component.FollowupAsync("That guessing board no longer exists.", ephemeral: true);
+                    return;
+                }
+
+                var (userMessage, session) = current.Value;
+
+                if (session.IsClosed)
+                {
+                    await component.FollowupAsync("Guessing is closed for this board.", ephemeral: true);
+                    return;
+                }
+
+                if (!session.Guesses.Any(guess => guess.UserId == component.User.Id))
+                {
+                    await component.FollowupAsync("You do not have a guess on this board.", ephemeral: true);
+                    return;
+                }
+
+                var updatedSession = session with
+                {
+                    Guesses = session.Guesses
+                        .Where(guess => guess.UserId != component.User.Id)
+                        .ToArray(),
+                };
+
+                await UpdateBoardAsync(userMessage, updatedSession);
+            }
+
+            await component.FollowupAsync("Your guess was removed.", ephemeral: true);
         }
-
-        var updatedSession = session with
+        catch (Exception exception)
         {
-            Guesses = session.Guesses
-                .Where(guess => guess.UserId != component.User.Id)
-                .ToArray(),
-        };
-
-        await component.UpdateAsync(properties =>
-        {
-            properties.Embed = PullCountGuessMessageBuilder.BuildEmbed(updatedSession);
-            properties.Components = PullCountGuessMessageBuilder.BuildComponents(updatedSession);
-        });
-        await component.FollowupAsync("Your guess was removed.", ephemeral: true);
+            logger.LogWarning(
+                exception,
+                "Failed to remove a guess from board {MessageId}.",
+                component.Message.Id);
+            await component.FollowupAsync("I could not update this guessing board.", ephemeral: true);
+        }
     }
 
     private static async Task CloseBoardAsync(SocketMessageComponent component)
@@ -199,30 +222,31 @@ public sealed class PullCountGuessHandler(ILogger<PullCountGuessHandler> logger)
             return;
         }
 
+        await UpdateEphemeralResponseAsync(component, "Closing guessing...");
+
         try
         {
-            var message = await component.Channel.GetMessageAsync(confirmation.MessageId);
-
-            if (message is not IUserMessage userMessage)
+            using (await messageMutationLock.AcquireAsync(confirmation.MessageId))
             {
-                await UpdateEphemeralResponseAsync(component, "That guessing board no longer exists.");
-                return;
+                var current = await LoadCurrentBoardAsync(component.Channel, confirmation.MessageId);
+                if (current is null)
+                {
+                    await component.FollowupAsync("That guessing board no longer exists.", ephemeral: true);
+                    return;
+                }
+
+                var (userMessage, session) = current.Value;
+
+                if (session.IsClosed)
+                {
+                    await component.FollowupAsync("Guessing is already closed for this board.", ephemeral: true);
+                    return;
+                }
+
+                await UpdateBoardAsync(userMessage, session with { IsClosed = true });
             }
 
-            if (!PullCountGuessMessageBuilder.TryReadSession(userMessage, isClosed: false, out var session))
-            {
-                await UpdateEphemeralResponseAsync(component, "I could not read that guessing board.");
-                return;
-            }
-
-            var closedSession = session with { IsClosed = true };
-
-            await userMessage.ModifyAsync(properties =>
-            {
-                properties.Embed = PullCountGuessMessageBuilder.BuildEmbed(closedSession);
-                properties.Components = PullCountGuessMessageBuilder.BuildComponents(closedSession);
-            });
-            await UpdateEphemeralResponseAsync(component, "Guessing closed.");
+            await component.FollowupAsync("Guessing closed.", ephemeral: true);
         }
         catch (Exception exception)
         {
@@ -230,9 +254,28 @@ public sealed class PullCountGuessHandler(ILogger<PullCountGuessHandler> logger)
                 exception,
                 "Failed to close pull-count guessing board {MessageId}.",
                 confirmation.MessageId);
-            await UpdateEphemeralResponseAsync(component, "I could not close this guessing board.");
+            await component.FollowupAsync("I could not close this guessing board.", ephemeral: true);
         }
     }
+
+    private static async Task<(IUserMessage Message, PullCountGuessSession Session)?> LoadCurrentBoardAsync(
+        IMessageChannel channel,
+        ulong messageId)
+    {
+        var message = await channel.GetMessageAsync(messageId, CacheMode.AllowDownload);
+
+        return message is IUserMessage userMessage
+            && PullCountGuessMessageBuilder.TryReadSession(userMessage, out var session)
+                ? (userMessage, session)
+                : null;
+    }
+
+    private static Task UpdateBoardAsync(IUserMessage message, PullCountGuessSession session) =>
+        message.ModifyAsync(properties =>
+        {
+            properties.Embed = PullCountGuessMessageBuilder.BuildEmbed(session);
+            properties.Components = PullCountGuessMessageBuilder.BuildComponents(session);
+        });
 
     private static bool TryParsePullCount(string? value, out int pullCount) =>
         int.TryParse(value, out pullCount)

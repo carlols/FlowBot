@@ -5,6 +5,32 @@ namespace FlowBot;
 
 public static partial class GroupFinderMessageParser
 {
+    public static bool TryReadSession(IUserMessage message, out GroupFinderSession session)
+    {
+        var buttonState = message.Components
+            .OfType<ActionRowComponent>()
+            .SelectMany(row => row.Components)
+            .OfType<ButtonComponent>()
+            .Select(button => button.CustomId ?? string.Empty)
+            .Select(customId => GroupFinderButtonIds.TryParse(customId, out var state)
+                ? state
+                : null)
+            .FirstOrDefault(state => state is not null);
+
+        if (buttonState is null)
+        {
+            session = default!;
+            return false;
+        }
+
+        return TryReadSession(
+            message,
+            buttonState.Capacity,
+            buttonState.CapacityNoticeSent,
+            buttonState.SessionStarted,
+            out session);
+    }
+
     public static bool TryReadSession(
         IMessage message,
         int? capacity,

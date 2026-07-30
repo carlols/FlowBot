@@ -5,6 +5,7 @@ namespace FlowBot;
 
 public sealed partial class GroupFinderButtonHandler
 {
+    private readonly DiscordMessageMutationLock _messageMutationLock;
     private readonly GroupFinderNotificationService _notificationService;
     private readonly GroupFinderRelatedMessageCleaner _relatedMessageCleaner;
     private readonly GroupFinderTimeParser _timeParser;
@@ -13,6 +14,7 @@ public sealed partial class GroupFinderButtonHandler
     private readonly ILogger<GroupFinderButtonHandler> _logger;
 
     public GroupFinderButtonHandler(
+        DiscordMessageMutationLock messageMutationLock,
         GroupFinderNotificationService notificationService,
         GroupFinderRelatedMessageCleaner relatedMessageCleaner,
         GroupFinderTimeParser timeParser,
@@ -20,6 +22,7 @@ public sealed partial class GroupFinderButtonHandler
         VoiceMemberMover voiceMemberMover,
         ILogger<GroupFinderButtonHandler> logger)
     {
+        _messageMutationLock = messageMutationLock;
         _notificationService = notificationService;
         _relatedMessageCleaner = relatedMessageCleaner;
         _timeParser = timeParser;
@@ -60,6 +63,18 @@ public sealed partial class GroupFinderButtonHandler
             return;
         }
 
+        if (buttonState.Action is GroupFinderButtonAction.Join or GroupFinderButtonAction.Leave)
+        {
+            await UpdateMembershipAsync(component, buttonState.Action);
+            return;
+        }
+
+        if (buttonState.Action == GroupFinderButtonAction.ScrambleTeams)
+        {
+            await ScrambleTeamsAsync(component);
+            return;
+        }
+
         if (!GroupFinderMessageParser.TryReadSession(
             component.Message,
             buttonState.Capacity,
@@ -71,89 +86,27 @@ public sealed partial class GroupFinderButtonHandler
             return;
         }
 
-        var playerIds = session.PlayerIds.ToList();
-        var userId = component.User.Id;
-        var isRegistered = playerIds.Contains(userId);
-
-        if (buttonState.Action == GroupFinderButtonAction.Close)
+        switch (buttonState.Action)
         {
-            await CloseGroupAsync(component, session);
-            return;
+            case GroupFinderButtonAction.Close:
+                await CloseGroupAsync(component, session);
+                break;
+            case GroupFinderButtonAction.Start:
+                await StartSessionAsync(component, session);
+                break;
+            case GroupFinderButtonAction.ReadyCheck:
+                await ReadyCheckAsync(component, session);
+                break;
+            case GroupFinderButtonAction.EditTime:
+                await EditTimeAsync(component, session);
+                break;
+            case GroupFinderButtonAction.MovePlayers:
+                await MovePlayersAsync(component, session);
+                break;
+            default:
+                await component.RespondAsync("I could not identify this group finder action.", ephemeral: true);
+                break;
         }
-
-        if (buttonState.Action == GroupFinderButtonAction.Start)
-        {
-            await StartSessionAsync(component, session);
-            return;
-        }
-
-        if (buttonState.Action == GroupFinderButtonAction.ReadyCheck)
-        {
-            await ReadyCheckAsync(component, session);
-            return;
-        }
-
-        if (buttonState.Action == GroupFinderButtonAction.EditTime)
-        {
-            await EditTimeAsync(component, session);
-            return;
-        }
-
-        if (buttonState.Action == GroupFinderButtonAction.ScrambleTeams)
-        {
-            await ScrambleTeamsAsync(component, session);
-            return;
-        }
-
-        if (buttonState.Action == GroupFinderButtonAction.MovePlayers)
-        {
-            await MovePlayersAsync(component, session);
-            return;
-        }
-
-        if (buttonState.Action == GroupFinderButtonAction.Join)
-        {
-            if (isRegistered)
-            {
-                await component.RespondAsync("You are already in this group.", ephemeral: true);
-                return;
-            }
-
-            if (session.IsFull)
-            {
-                await component.RespondAsync("This group is already full.", ephemeral: true);
-                return;
-            }
-
-            playerIds.Add(userId);
-            var updatedSession = session with { PlayerIds = playerIds, TeamIds = [] };
-
-            if (updatedSession.IsFull && !session.CapacityNoticeSent)
-            {
-                updatedSession = updatedSession with { CapacityNoticeSent = true };
-                await UpdateGroupMessageAsync(component, updatedSession);
-                await _notificationService.SendCapacityNoticeAsync(component, updatedSession);
-                await component.FollowupAsync("You joined the group.", ephemeral: true);
-                return;
-            }
-
-            await UpdateGroupMessageAsync(component, updatedSession);
-            await component.FollowupAsync("You joined the group.", ephemeral: true);
-            return;
-        }
-
-        if (!isRegistered)
-        {
-            await component.RespondAsync("You are not in this group.", ephemeral: true);
-            return;
-        }
-
-        playerIds.Remove(userId);
-        var readyStates = session.ReadyStates
-            .Where(pair => pair.Key != userId)
-            .ToDictionary(pair => pair.Key, pair => pair.Value);
-        await UpdateGroupMessageAsync(component, session with { PlayerIds = playerIds, ReadyStates = readyStates, TeamIds = [] });
-        await component.FollowupAsync("You left the group.", ephemeral: true);
     }
 
     public async Task HandleModalAsync(SocketModal modal)
@@ -167,22 +120,116 @@ public sealed partial class GroupFinderButtonHandler
         await HandleReadyCheckModalAsync(modal);
     }
 
-    private async Task UpdateGroupMessageAsync(SocketMessageComponent component, GroupFinderSession session)
+    private async Task UpdateMembershipAsync(
+        SocketMessageComponent component,
+        GroupFinderButtonAction action)
     {
+        await component.DeferAsync(ephemeral: true);
+
         try
         {
-            await component.UpdateAsync(properties =>
+            GroupFinderSession? capacityNoticeSession = null;
+            string response;
+
+            using (await _messageMutationLock.AcquireAsync(component.Message.Id))
             {
-                properties.Embed = GroupFinderMessageBuilder.BuildEmbed(session);
-                properties.Components = GroupFinderMessageBuilder.BuildComponents(session);
-            });
+                var current = await LoadCurrentSessionAsync(component.Channel, component.Message.Id);
+                if (current is null)
+                {
+                    await component.FollowupAsync("That group message no longer exists.", ephemeral: true);
+                    return;
+                }
+
+                var (message, session) = current.Value;
+                var playerIds = session.PlayerIds.ToList();
+                var userId = component.User.Id;
+                var isRegistered = playerIds.Contains(userId);
+
+                if (action == GroupFinderButtonAction.Join)
+                {
+                    if (isRegistered)
+                    {
+                        await component.FollowupAsync("You are already in this group.", ephemeral: true);
+                        return;
+                    }
+
+                    if (session.IsFull)
+                    {
+                        await component.FollowupAsync("This group is already full.", ephemeral: true);
+                        return;
+                    }
+
+                    playerIds.Add(userId);
+                    var updatedSession = session with { PlayerIds = playerIds, TeamIds = [] };
+
+                    if (updatedSession.IsFull && !session.CapacityNoticeSent)
+                    {
+                        updatedSession = updatedSession with { CapacityNoticeSent = true };
+                        capacityNoticeSession = updatedSession;
+                    }
+
+                    await UpdateGroupMessageAsync(message, updatedSession);
+                    response = "You joined the group.";
+                }
+                else
+                {
+                    if (!isRegistered)
+                    {
+                        await component.FollowupAsync("You are not in this group.", ephemeral: true);
+                        return;
+                    }
+
+                    playerIds.Remove(userId);
+                    var readyStates = session.ReadyStates
+                        .Where(pair => pair.Key != userId)
+                        .ToDictionary(pair => pair.Key, pair => pair.Value);
+                    var updatedSession = session with
+                    {
+                        PlayerIds = playerIds,
+                        ReadyStates = readyStates,
+                        TeamIds = [],
+                    };
+
+                    await UpdateGroupMessageAsync(message, updatedSession);
+                    response = "You left the group.";
+                }
+            }
+
+            if (capacityNoticeSession is not null)
+            {
+                await _notificationService.SendCapacityNoticeAsync(component, capacityNoticeSession);
+            }
+
+            await component.FollowupAsync(response, ephemeral: true);
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Failed to update group finder message {MessageId}.", component.Message.Id);
-            await component.RespondAsync("I could not update this group message.", ephemeral: true);
+            _logger.LogWarning(
+                exception,
+                "Failed to update membership for group finder message {MessageId}.",
+                component.Message.Id);
+            await component.FollowupAsync("I could not update this group message.", ephemeral: true);
         }
     }
+
+    private static async Task<(IUserMessage Message, GroupFinderSession Session)?> LoadCurrentSessionAsync(
+        IMessageChannel channel,
+        ulong messageId)
+    {
+        var message = await channel.GetMessageAsync(messageId, CacheMode.AllowDownload);
+
+        return message is IUserMessage userMessage
+            && GroupFinderMessageParser.TryReadSession(userMessage, out var session)
+                ? (userMessage, session)
+                : null;
+    }
+
+    private static Task UpdateGroupMessageAsync(IUserMessage message, GroupFinderSession session) =>
+        message.ModifyAsync(properties =>
+        {
+            properties.Embed = GroupFinderMessageBuilder.BuildEmbed(session);
+            properties.Components = GroupFinderMessageBuilder.BuildComponents(session);
+        });
 
     private static Task UpdateEphemeralResponseAsync(SocketMessageComponent component, string content) =>
         component.UpdateAsync(properties =>

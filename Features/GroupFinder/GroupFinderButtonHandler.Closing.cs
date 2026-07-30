@@ -46,24 +46,38 @@ public sealed partial class GroupFinderButtonHandler
             return;
         }
 
+        await UpdateEphemeralResponseAsync(component, "Closing group...");
+
         try
         {
-            var message = await component.Channel.GetMessageAsync(confirmation.MessageId);
+            int deletedRelatedMessages;
 
-            if (message is null)
+            using (await _messageMutationLock.AcquireAsync(confirmation.MessageId))
             {
-                await UpdateEphemeralResponseAsync(component, "That group message no longer exists.");
-                return;
+                var current = await LoadCurrentSessionAsync(component.Channel, confirmation.MessageId);
+                if (current is null)
+                {
+                    await component.FollowupAsync("That group message no longer exists.", ephemeral: true);
+                    return;
+                }
+
+                var (message, session) = current.Value;
+
+                if (!CanCloseGroup(component.User, session.HostUserId))
+                {
+                    await component.FollowupAsync("Only the host or moderators can close this group.", ephemeral: true);
+                    return;
+                }
+
+                deletedRelatedMessages = await _relatedMessageCleaner.DeleteRelatedMessagesAsync(message);
+                await message.DeleteAsync();
             }
 
-            var deletedRelatedMessages = await _relatedMessageCleaner.DeleteRelatedMessagesAsync(message);
-            await message.DeleteAsync();
-
-            await UpdateEphemeralResponseAsync(
-                component,
+            await component.FollowupAsync(
                 deletedRelatedMessages > 0
                     ? $"Group closed. Deleted {deletedRelatedMessages} related Flowbot message{(deletedRelatedMessages == 1 ? string.Empty : "s")}."
-                    : "Group closed.");
+                    : "Group closed.",
+                ephemeral: true);
         }
         catch (Exception exception)
         {
@@ -71,7 +85,7 @@ public sealed partial class GroupFinderButtonHandler
                 exception,
                 "Failed to delete group finder message {MessageId}.",
                 confirmation.MessageId);
-            await UpdateEphemeralResponseAsync(component, "I could not delete this group message.");
+            await component.FollowupAsync("I could not delete this group message.", ephemeral: true);
         }
     }
 
@@ -86,5 +100,4 @@ public sealed partial class GroupFinderButtonHandler
             && (guildUser.GuildPermissions.Administrator
                 || guildUser.GuildPermissions.ManageMessages);
     }
-
 }

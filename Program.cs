@@ -11,6 +11,7 @@ builder.Services.Configure<FlowBotOptions>(
 builder.Services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
 {
     GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildVoiceStates,
+    MessageCacheSize = 0,
     LogGatewayIntentWarnings = false,
 }));
 
@@ -27,6 +28,7 @@ builder.Services.AddSingleton(sp =>
 });
 
 builder.Services.AddSingleton<RoleButtonHandler>();
+builder.Services.AddSingleton<DiscordMessageMutationLock>();
 builder.Services.AddSingleton<GroupFinderButtonHandler>();
 builder.Services.AddSingleton<GroupFinderNotificationService>();
 builder.Services.AddSingleton<GroupFinderRelatedMessageCleaner>();
