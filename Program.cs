@@ -39,7 +39,8 @@ builder.Services.AddSingleton<HttpClient>();
 builder.Services.AddSingleton<EmojiImportHandler>();
 builder.Services.AddSingleton<EmojiImageOptimizer>();
 builder.Services.AddSingleton<SevenTvEmojiService>();
-builder.Services.AddSingleton<RaidVoiceSplitHandler>();
+builder.Services.AddSingleton<VoiceMemberMover>();
+builder.Services.AddSingleton<RoleVoiceMoveHandler>();
 builder.Services.AddSingleton<DiscordInteractionRouter>();
 builder.Services.AddHostedService<DiscordBotService>();
 

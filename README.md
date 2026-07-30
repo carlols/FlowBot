@@ -10,7 +10,8 @@ FlowBot is a private Discord bot built with .NET 9 and Discord.Net.
 - `Features/`: larger feature areas grouped by domain.
 - `Features/EmojiImports/`: right-click message command and 7TV link command for importing custom emojis.
 - `Features/GroupFinder/`: joinable group finder messages for game sessions.
-- `Features/RaidVoiceSplits/`: admin controls for moving a role-based raid split into a voice channel.
+- `Features/RoleVoiceMoves/`: admin controls for moving connected members with a role between voice channels.
+- `Features/VoiceMoves/`: shared voice-member movement logic.
 - `Features/RoleMessages/`: self-assignable role message command and button handling.
 
 ## Local Setup
@@ -83,31 +84,30 @@ Example:
 
 Admins can click `End Guessing`, then confirm, to close the board and disable its buttons. FlowBot stores the board state in the Discord message/embed/components, so active boards continue to work after FlowBot restarts.
 
-### `/raid-voice-split`
+### `/move-role-to-channel`
 
-Creates an admin-only control message for moving connected members with a selected role into a selected voice channel. This is useful for raid encounters where a predictable split group needs to move voice channels at a specific moment.
+Creates an admin-only control message for moving connected members with a selected role into a destination voice channel and, optionally, back to a configured return channel.
 
 Required permissions:
 
 - The user running the command needs `Administrator`.
 - FlowBot needs `Move Members`.
-- FlowBot needs `Connect` in the target voice channel.
+- FlowBot needs `View Channel` and `Connect` in each configured destination or return voice channel.
 - FlowBot must be able to see the relevant voice channels.
 
 Parameters:
 
-- `role-to-move`: required role whose currently connected members should be moved.
-- `target-channel`: required voice channel to move the role group into.
-- `main-channel`: optional voice channel to move the role group back into.
+- `role`: required role whose currently connected members should be moved.
+- `destination-channel`: required voice channel to move the role members into.
+- `return-channel`: optional voice channel to move the role members back into.
 
 Example:
 
 ```text
-/raid-voice-split role-to-move:@Boss Group 2 target-channel:Split Voice main-channel:Raid Voice
+/move-role-to-channel role:@Team 2 destination-channel:Team Voice return-channel:Main Voice
 ```
 
-Admins can click `Move to split` to move all currently connected, non-bot members with the selected role who are not already in the split voice channel. When `main-channel` is provided, admins can click `Move back` to move those same role members back to the main voice channel. Admins can click `Close` to delete the control message.
-
+Admins can click `Move to destination` to move all currently connected, non-bot members with the selected role who are not already in that channel. When `return-channel` is provided, admins can click `Move to return channel` to move those role members back. Flowbot submits the member moves concurrently, while Discord.Net queues individual API requests as needed for Discord's rate limits. Admins can click `Close` to delete the control message.
 ### `Import Emoji`
 
 Right-click a Discord message, choose `Apps`, then choose `Import Emoji`. If the message has one custom emoji, FlowBot opens a private name form before importing. If the message has multiple custom emojis, FlowBot first shows a private dropdown so the server owner can choose which emoji to import, then opens the name form. Discord select menus support up to 25 options, so messages with more than 25 custom emojis are rejected for now.

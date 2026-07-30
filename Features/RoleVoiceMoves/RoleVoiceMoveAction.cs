@@ -1,6 +1,6 @@
 namespace FlowBot;
 
-public enum RaidVoiceSplitAction
+public enum RoleVoiceMoveAction
 {
     MoveGroup,
     Close,
