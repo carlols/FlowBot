@@ -153,9 +153,9 @@ public static class GroupFinderMessageBuilder
     private static string FormatReadyState(GroupFinderReadyState state) =>
         state switch
         {
-            GroupFinderReadyState.Ready => "ready",
-            GroupFinderReadyState.NotReady => "not ready",
-            _ => "waiting",
+            GroupFinderReadyState.Ready => "✅ Ready",
+            GroupFinderReadyState.NotReady => "❌ Not ready",
+            _ => "⏳ Waiting",
         };
 
 }

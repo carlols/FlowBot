@@ -171,7 +171,9 @@ public static partial class GroupFinderMessageParser
 
     private static bool TryParseReadyState(string value, out GroupFinderReadyState state)
     {
-        state = value switch
+        var normalizedValue = value.ToLowerInvariant();
+
+        state = normalizedValue switch
         {
             "ready" => GroupFinderReadyState.Ready,
             "not ready" => GroupFinderReadyState.NotReady,
@@ -179,13 +181,13 @@ public static partial class GroupFinderMessageParser
             _ => GroupFinderReadyState.Waiting,
         };
 
-        return value is "ready" or "not ready" or "waiting";
+        return normalizedValue is "ready" or "not ready" or "waiting";
     }
 
     [GeneratedRegex("<@!?(?<id>\\d+)>")]
     private static partial Regex PlayerMentionRegex();
 
-    [GeneratedRegex(@"^\d+\.\s+<@!?(?<id>\d+)>(?:\s+-\s+(?<state>ready|not ready|waiting))?$", RegexOptions.Multiline)]
+    [GeneratedRegex(@"^\d+\.\s+<@!?(?<id>\d+)>(?:\s+-\s+(?:✅|❌|⏳)?\s*(?<state>ready|not ready|waiting))?$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
     private static partial Regex PlayerLineRegex();
 
     [GeneratedRegex("<t:(?<timestamp>\\d+):[a-zA-Z]>")]
