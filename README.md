@@ -12,7 +12,9 @@ FlowBot is a private Discord bot built with .NET 9 and Discord.Net.
 - `Features/GroupFinder/`: joinable group finder messages for game sessions.
 - `Features/RoleVoiceMoves/`: admin controls for moving connected members with a role between voice channels.
 - `Features/VoiceMoves/`: shared voice-member movement logic.
-- `Features/RoleMessages/`: self-assignable role message command and button handling.
+- `Features/RoleMessages/`: focused single-role messages and button handling.
+- `Features/RolePanels/`: compact multi-role panels with private member and admin editors.
+- `Features/Roles/`: shared safety rules for self-assignable roles.
 
 ## Local Setup
 
@@ -48,22 +50,55 @@ FlowBot is a private Discord bot built with .NET 9 and Discord.Net.
 
 Shows a private summary of FlowBot commands and group finder button behavior.
 
-### `/role-message`
+### `/role-panel`
 
-Creates a message with buttons that let server members assign or remove a role from themselves.
+Creates a compact panel where members can privately manage several self-assignable roles.
 
 Required permissions:
 
-- The user running the command needs `Administrator`.
-- FlowBot needs `Manage Roles`.
-- FlowBot's highest role must be above the role it assigns.
+- The user running the command and editing the panel needs `Administrator`.
+- Flowbot needs `Manage Roles`.
+- Flowbot's highest role must be above every role in the panel.
+- Administrative, managed, and `@everyone` roles cannot be added.
+
+Parameters:
+
+- `first-role`: required initial role. Additional roles are added through the private editor.
+- `title`: optional panel heading. Defaults to `Choose your roles`.
+- `description`: optional guidance shown above the role list.
 
 Example:
 
 ```text
-/role-message role:@Raider message:Click below to get raid notifications.
+/role-panel first-role:@movie-goer title:Game and activity roles description:Choose the things you want to hear about.
 ```
 
+After creation, right-click the panel and choose `Apps > Manage Role Panel`. The resulting admin editor is ephemeral and provides separate menus for adding and removing roles. Edits modify the original panel in place; Flowbot does not post setup or confirmation messages in the channel. Panels support up to 25 roles.
+
+Members click `Manage my roles` to open an ephemeral multi-select menu. Their current roles are preselected, and submitting the menu adds and removes roles until their selection matches. The role list is stored in the Discord message itself, so panels continue working after Flowbot restarts without a database.
+
+### `/role-message`
+
+Creates a focused message for one self-assignable role. New messages use one compact button that adds the role when the member does not have it and removes it when they do. Existing role messages with separate add and remove buttons remain compatible.
+
+Required permissions:
+
+- The user running the command needs `Administrator`.
+- Flowbot needs `Manage Roles`.
+- Flowbot's highest role must be above the role it assigns.
+- Administrative, managed, and `@everyone` roles cannot be used.
+
+Parameters:
+
+- `role`: required self-assignable role.
+- `message`: optional explanation of what the role is for.
+- `title`: optional friendly title shown instead of the raw role name.
+
+Example:
+
+```text
+/role-message role:@Raider message:Receive raid announcements. title:Raid notifications
+```
 ### `/guess-pull-count`
 
 Creates a boss pull-count guessing board. Server members can add, update, or remove their own guesses with buttons. Guesses are sorted from highest to lowest and split across fields in groups of 10.

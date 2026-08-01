@@ -8,52 +8,28 @@ public sealed class RoleMessageModule : InteractionModuleBase<SocketInteractionC
 {
     [SlashCommand("role-message", "Creates a self-assignable role message in this channel.")]
     [RequireContext(ContextType.Guild)]
+    [DefaultMemberPermissions(GuildPermission.Administrator)]
     [RequireUserPermission(GuildPermission.Administrator)]
     [RequireBotPermission(GuildPermission.ManageRoles)]
     public async Task CreateRoleMessageAsync(
-        [Summary("role", "The role users will receive when they click the button.")] SocketRole role,
-        [Summary("message", "The message Flowbot should post above the button.")][MaxLength(4096)] string message = "Click the button below to receive this role.")
+        [Summary("role", "The role members can add or remove from themselves.")] SocketRole role,
+        [Summary("message", "A short explanation of what this role is for.")][MaxLength(4096)] string message = "Use this role to receive its related notifications and access.",
+        [Summary("title", "Optional friendly title shown instead of the role name.")][MaxLength(256)] string? title = null)
     {
-        if (role.IsEveryone)
+        if (!SelfAssignableRoleValidator.TryValidate(Context.Guild, role, out var errorMessage))
         {
-            await RespondAsync("I cannot create a self-assign button for @everyone.", ephemeral: true);
+            await RespondAsync(errorMessage, ephemeral: true);
             return;
         }
 
-        if (role.IsManaged)
-        {
-            await RespondAsync("I cannot assign managed integration or bot roles.", ephemeral: true);
-            return;
-        }
-
-        if (role.Position >= Context.Guild.CurrentUser.Hierarchy)
-        {
-            await RespondAsync(
-                $"I cannot assign {role.Mention} because it is at or above my highest role. Move Flowbot's role above it and try again.",
-                ephemeral: true);
-            return;
-        }
-
-        var component = new ComponentBuilder()
-            .WithButton(
-                label: $"Get {role.Name}",
-                customId: RoleButtonIds.CreateAddRoleId(role.Id),
-                style: ButtonStyle.Success)
-            .WithButton(
-                label: $"Remove {role.Name}",
-                customId: RoleButtonIds.CreateRemoveRoleId(role.Id),
-                style: ButtonStyle.Danger)
-            .Build();
-
-        var embed = new EmbedBuilder()
-            .WithTitle(role.Name)
-            .WithDescription(message)
-            .AddField("Assignable role", role.Mention, inline: true)
-            .WithColor(new Color(88, 101, 242))
-            .WithFooter("Use the buttons below to add or remove this role.")
-            .Build();
+        var normalizedTitle = string.IsNullOrWhiteSpace(title) ? role.Name : title.Trim();
+        var normalizedMessage = string.IsNullOrWhiteSpace(message)
+            ? "Use this role to receive its related notifications and access."
+            : message.Trim();
 
         await RespondAsync("Role message created.", ephemeral: true);
-        await Context.Channel.SendMessageAsync(embed: embed, components: component);
+        await Context.Channel.SendMessageAsync(
+            embed: RoleMessageBuilder.BuildEmbed(role, normalizedTitle, normalizedMessage),
+            components: RoleMessageBuilder.BuildComponents(role));
     }
 }

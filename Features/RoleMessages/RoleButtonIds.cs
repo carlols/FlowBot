@@ -4,14 +4,18 @@ public static class RoleButtonIds
 {
     private const string AddRolePrefix = "flowbot-role-add:";
     private const string RemoveRolePrefix = "flowbot-role-remove:";
+    private const string ToggleRolePrefix = "flowbot-role-toggle:";
 
     public static string CreateAddRoleId(ulong roleId) => $"{AddRolePrefix}{roleId}";
 
     public static string CreateRemoveRoleId(ulong roleId) => $"{RemoveRolePrefix}{roleId}";
 
+    public static string CreateToggleRoleId(ulong roleId) => $"{ToggleRolePrefix}{roleId}";
+
     public static bool IsRoleButton(string customId) =>
         customId.StartsWith(AddRolePrefix, StringComparison.Ordinal)
-        || customId.StartsWith(RemoveRolePrefix, StringComparison.Ordinal);
+        || customId.StartsWith(RemoveRolePrefix, StringComparison.Ordinal)
+        || customId.StartsWith(ToggleRolePrefix, StringComparison.Ordinal);
 
     public static bool TryParse(string customId, out RoleButtonAction action, out ulong roleId)
     {
@@ -20,7 +24,12 @@ public static class RoleButtonIds
             return true;
         }
 
-        return TryParse(customId, RemoveRolePrefix, RoleButtonAction.Remove, out action, out roleId);
+        if (TryParse(customId, RemoveRolePrefix, RoleButtonAction.Remove, out action, out roleId))
+        {
+            return true;
+        }
+
+        return TryParse(customId, ToggleRolePrefix, RoleButtonAction.Toggle, out action, out roleId);
     }
 
     private static bool TryParse(

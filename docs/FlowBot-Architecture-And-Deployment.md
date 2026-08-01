@@ -77,6 +77,7 @@ Examples:
 
 - `Commands/PingModule.cs`
 - `Features/RoleMessages/RoleMessageModule.cs`
+- `Features/RolePanels/RolePanelModule.cs`
 - `Features/GroupFinder/GroupFinderModule.cs`
 
 Commands are registered when Discord reports that the bot is ready:
@@ -97,7 +98,7 @@ Server-scoped command registration updates quickly, which is ideal for developme
 
 ## 5. Command and Button Flow
 
-When someone runs `/ping`, `/role-message`, or `/group-finder`, Discord sends an `InteractionCreated` event.
+When someone runs `/ping`, `/role-message`, `/role-panel`, or `/group-finder`, Discord sends an `InteractionCreated` event.
 
 That event enters `DiscordInteractionRouter.RouteAsync`.
 
@@ -143,31 +144,35 @@ FlowBot is organized by feature and infrastructure:
 - `Commands/`: small standalone slash commands.
 - `Configuration/`: strongly typed configuration.
 - `Discord/`: Discord client hosting, connection, and event routing.
-- `Features/RoleMessages/`: self-assignable role message feature.
+- `Features/RoleMessages/`: focused self-assignable role messages.
+- `Features/RolePanels/`: multi-role panels and private member/admin editors.
+- `Features/Roles/`: shared self-assignable-role safety rules.
 - `Features/GroupFinder/`: joinable group finder messages.
 
-## 7. Role Messages
+## 7. Role Panels and Messages
 
-Role messages live in `Features/RoleMessages`.
+Role panels live in `Features/RolePanels`. `/role-panel` creates one public message containing its title, description, role mentions, and a `Manage my roles` button. The role IDs are read back from that message, so no database is needed and a restart does not invalidate the panel.
 
-`RoleMessageModule` creates a Discord message with buttons for adding and removing a role.
+When a member opens a panel:
 
-The buttons use custom IDs like:
+1. `DiscordInteractionRouter` recognizes the role-panel component ID.
+2. `RolePanelHandler` parses the roles from the public message.
+3. Flowbot creates an ephemeral string-select menu with the member's current roles preselected.
+4. The member submits the complete selection they want.
+5. `RoleSelectionUpdater` adds and removes only the roles belonging to that panel.
+6. Flowbot updates the same ephemeral response with the result.
+
+Administrators right-click a panel and use the `Manage Role Panel` message command. Its add-role and remove-role menus are also ephemeral. Each change acquires `DiscordMessageMutationLock`, fetches the latest panel, and modifies that public message in place. No administration or confirmation message is posted in the channel.
+
+Focused role messages remain in `Features/RoleMessages`. New `/role-message` posts use one toggle button:
 
 ```text
-flowbot-role-add:<roleId>
-flowbot-role-remove:<roleId>
+flowbot-role-toggle:<roleId>
 ```
 
-When someone clicks a button:
+`RoleButtonHandler` checks whether the clicking member currently has the role, then adds or removes it. The older `flowbot-role-add:<roleId>` and `flowbot-role-remove:<roleId>` IDs are still recognized so existing messages keep working.
 
-1. `DiscordInteractionRouter` recognizes the custom ID.
-2. It calls `RoleButtonHandler`.
-3. The handler parses the role ID.
-4. It checks role existence, role hierarchy, and whether the user already has the role.
-5. It adds or removes the role.
-6. It responds ephemerally to the user.
-
+Both features use `SelfAssignableRoleValidator` to reject `@everyone`, managed roles, administrative roles, and roles above Flowbot's hierarchy. Assignment is checked separately from removal so members can still relinquish a role if its permissions later become restricted.
 ## 8. Group Finder
 
 Group finder lives in `Features/GroupFinder`.
