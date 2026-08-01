@@ -7,6 +7,7 @@ public sealed class DiscordInteractionRouter(
     DiscordSocketClient client,
     InteractionService interactions,
     RoleButtonHandler roleButtonHandler,
+    RolePanelHandler rolePanelHandler,
     GroupFinderButtonHandler groupFinderButtonHandler,
     PullCountGuessHandler pullCountGuessHandler,
     EmojiImportHandler emojiImportHandler,
@@ -18,6 +19,12 @@ public sealed class DiscordInteractionRouter(
     {
         if (interaction is SocketMessageComponent component)
         {
+            if (RolePanelIds.IsRolePanelInteraction(component.Data.CustomId))
+            {
+                await rolePanelHandler.HandleAsync(component);
+                return;
+            }
+
             if (RoleButtonIds.IsRoleButton(component.Data.CustomId))
             {
                 await roleButtonHandler.HandleAsync(component);

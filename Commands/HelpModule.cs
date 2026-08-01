@@ -31,8 +31,11 @@ public sealed class HelpModule : InteractionModuleBase<SocketInteractionContext>
                 "/import-7tv-emoji",
                 "Server owners and members with `Big Lord` can import a Discord-sized 7TV emote from a link or emote ID, rename it, and add it to the server.")
             .AddField(
+                "/role-panel",
+                "Admins can create a compact panel for several self-assignable roles. Members manage their selection privately; admins edit the panel through `Apps > Manage Role Panel`.")
+            .AddField(
                 "/role-message",
-                "Admins can create a message that lets members add or remove a server role from themselves.")
+                "Admins can highlight one self-assignable role with a compact add-or-remove button.")
             .AddField(
                 "/ping",
                 "Checks whether Flowbot is awake.")

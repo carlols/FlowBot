@@ -4,4 +4,5 @@ public enum RoleButtonAction
 {
     Add,
     Remove,
+    Toggle,
 }

@@ -27,28 +27,32 @@ public sealed class RoleButtonHandler(ILogger<RoleButtonHandler> logger)
         }
 
         var hasRole = user.Roles.Any(userRole => userRole.Id == role.Id);
+        var resolvedAction = action == RoleButtonAction.Toggle
+            ? hasRole ? RoleButtonAction.Remove : RoleButtonAction.Add
+            : action;
+        var roleIsValid = resolvedAction == RoleButtonAction.Add
+            ? SelfAssignableRoleValidator.TryValidate(user.Guild, role, out var errorMessage)
+            : SelfAssignableRoleValidator.TryValidateManageable(user.Guild, role, out errorMessage);
 
-        if (action == RoleButtonAction.Add && hasRole)
+        if (!roleIsValid)
+        {
+            await component.RespondAsync(errorMessage, ephemeral: true);
+            return;
+        }
+
+        if (resolvedAction == RoleButtonAction.Add && hasRole)
         {
             await component.RespondAsync($"You already have the {role.Mention} role.", ephemeral: true);
             return;
         }
 
-        if (action == RoleButtonAction.Remove && !hasRole)
+        if (resolvedAction == RoleButtonAction.Remove && !hasRole)
         {
             await component.RespondAsync($"You do not have the {role.Mention} role.", ephemeral: true);
             return;
         }
 
-        if (role.Position >= user.Guild.CurrentUser.Hierarchy)
-        {
-            await component.RespondAsync(
-                $"I cannot manage {role.Mention} because it is at or above my highest role.",
-                ephemeral: true);
-            return;
-        }
-
-        await UpdateRoleAsync(component, user, role, action);
+        await UpdateRoleAsync(component, user, role, resolvedAction);
     }
 
     private async Task UpdateRoleAsync(
@@ -62,12 +66,12 @@ public sealed class RoleButtonHandler(ILogger<RoleButtonHandler> logger)
             if (action == RoleButtonAction.Add)
             {
                 await user.AddRoleAsync(role);
-                await component.RespondAsync($"You now have the {role.Mention} role.", ephemeral: true);
+                await component.RespondAsync($"Added {role.Mention}.", ephemeral: true);
                 return;
             }
 
             await user.RemoveRoleAsync(role);
-            await component.RespondAsync($"Removed the {role.Mention} role from you.", ephemeral: true);
+            await component.RespondAsync($"Removed {role.Mention}.", ephemeral: true);
         }
         catch (Exception exception)
         {

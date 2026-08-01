@@ -28,6 +28,8 @@ builder.Services.AddSingleton(sp =>
 });
 
 builder.Services.AddSingleton<RoleButtonHandler>();
+builder.Services.AddSingleton<RolePanelHandler>();
+builder.Services.AddSingleton<RoleSelectionUpdater>();
 builder.Services.AddSingleton<DiscordMessageMutationLock>();
 builder.Services.AddSingleton<GroupFinderButtonHandler>();
 builder.Services.AddSingleton<GroupFinderNotificationService>();
