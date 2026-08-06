@@ -143,6 +143,30 @@ Example:
 ```
 
 Admins can click `Move to destination` to move all currently connected, non-bot members with the selected role who are not already in that channel. When `return-channel` is provided, admins can click `Move to return channel` to move those role members back. Flowbot submits the member moves concurrently, while Discord.Net queues individual API requests as needed for Discord's rate limits. Admins can click `Close` to delete the control message.
+
+### `/move-channel-members`
+
+Immediately moves the current non-bot members of one voice channel into another voice channel. Unlike `/move-role-to-channel`, this is a one-time action and does not create a control message.
+
+Required permissions:
+
+- The user running the command needs `Administrator`.
+- Flowbot needs `Move Members` and `View Channel` in the source voice channel.
+- Flowbot needs `Move Members`, `View Channel`, and `Connect` in the destination voice channel.
+
+Parameters:
+
+- `from-channel`: required voice channel whose current members should be moved.
+- `to-channel`: required destination voice channel.
+
+Example:
+
+```text
+/move-channel-members from-channel:Activity Voice to-channel:Main Voice
+```
+
+Flowbot takes a snapshot of the source channel when the command runs, excludes bots, and submits those member moves concurrently. Anyone joining the source channel after that snapshot is not included. The result is only shown to the admin who ran the command.
+
 ### `Import Emoji`
 
 Right-click a Discord message, choose `Apps`, then choose `Import Emoji`. If the message has one custom emoji, FlowBot opens a private name form before importing. If the message has multiple custom emojis, FlowBot first shows a private dropdown so the server owner can choose which emoji to import, then opens the name form. Discord select menus support up to 25 options, so messages with more than 25 custom emojis are rejected for now.
