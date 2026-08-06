@@ -25,6 +25,9 @@ public sealed class HelpModule : InteractionModuleBase<SocketInteractionContext>
                 "/move-role-to-channel",
                 "Admins can create controls that move connected members with a selected role to a destination and optional return voice channel.")
             .AddField(
+                "/move-channel-members",
+                "Admins can immediately move everyone currently connected to one voice channel into another.")
+            .AddField(
                 "Import Emoji",
                 "Server owners and members with `Big Lord` can right-click a message with custom emojis and use `Apps > Import Emoji` to choose one, rename it, and add it to the server.")
             .AddField(

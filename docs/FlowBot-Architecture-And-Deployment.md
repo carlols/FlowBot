@@ -214,6 +214,8 @@ When the creator clicks `Scramble Teams`, `GroupFinderButtonHandler` reads the c
 
 When the creator or a server administrator clicks `Move Players`, Flowbot responds with a private voice-channel picker. After a destination is selected, the handler refetches the group message, reads the latest registered player list, finds which players are connected to voice, and delegates their concurrent moves to `VoiceMemberMover`. The selected channel is not stored in the group message.
 
+The standalone `/move-channel-members` command uses the same `VoiceMemberMover` service. It snapshots the non-bot members currently connected to the selected source voice channel, submits their moves concurrently, and reports the outcome ephemerally. It creates no message or persistent state. This differs from `/move-role-to-channel`, whose reusable control message selects connected users by role, and from group finder voice moves, which select registered players.
+
 The close flow is two-step:
 
 1. User clicks `Close`.
