@@ -50,6 +50,23 @@ FlowBot is a private Discord bot built with .NET 9 and Discord.Net.
 
 Shows a private summary of FlowBot commands and group finder button behavior.
 
+### `/roll`
+
+Rolls a random number publicly and identifies the member who rolled it. The default range is 1-100.
+
+Parameters:
+
+- `maximum`: optional highest possible result. Must be at least 1 and defaults to 100.
+
+Examples:
+
+```text
+/roll
+/roll maximum:20
+```
+
+Flowbot responds with a message such as `@Flowie rolled 75 (1-100).` Discord also displays the member's slash-command invocation directly above the response.
+
 ### `/role-panel`
 
 Creates a compact panel where members can privately manage several self-assignable roles.

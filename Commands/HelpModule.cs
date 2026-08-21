@@ -40,6 +40,9 @@ public sealed class HelpModule : InteractionModuleBase<SocketInteractionContext>
                 "/role-message",
                 "Admins can highlight one self-assignable role with a compact add-or-remove button.")
             .AddField(
+                "/roll",
+                "Roll a public random number from 1-100, or choose a different maximum with `maximum`.")
+            .AddField(
                 "/ping",
                 "Checks whether Flowbot is awake.")
             .WithFooter("Most Flowbot responses to setup and help commands are private to you.")
