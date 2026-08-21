@@ -98,7 +98,7 @@ Server-scoped command registration updates quickly, which is ideal for developme
 
 ## 5. Command and Button Flow
 
-When someone runs `/ping`, `/role-message`, `/role-panel`, or `/group-finder`, Discord sends an `InteractionCreated` event.
+When someone runs `/ping`, `/roll`, `/role-message`, `/role-panel`, or `/group-finder`, Discord sends an `InteractionCreated` event.
 
 That event enters `DiscordInteractionRouter.RouteAsync`.
 
