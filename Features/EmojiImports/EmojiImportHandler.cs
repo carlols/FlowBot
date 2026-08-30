@@ -211,8 +211,8 @@ public sealed class EmojiImportHandler(
                 ConvertToPngBeforeUpload: false);
         }
 
-        var sevenTvEmoji = await sevenTvEmojiService.GetEmojiAsync(state.SourceId);
-        if (sevenTvEmoji is null)
+        var lookupResult = await sevenTvEmojiService.GetEmojiAsync(state.SourceId);
+        if (lookupResult.Asset is not { } sevenTvEmoji)
         {
             return null;
         }

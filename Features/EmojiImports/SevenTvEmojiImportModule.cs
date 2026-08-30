@@ -29,11 +29,11 @@ public sealed class SevenTvEmojiImportModule(SevenTvEmojiService sevenTvEmojiSer
             return;
         }
 
-        var emoji = await sevenTvEmojiService.GetEmojiAsync(emoteId);
-        if (emoji is null)
+        var lookupResult = await sevenTvEmojiService.GetEmojiAsync(emoteId);
+        if (lookupResult.Asset is not { } emoji)
         {
             await RespondAsync(
-                "I could not find that 7TV emote, or it does not have a Discord-compatible image file.",
+                lookupResult.ErrorMessage ?? "I could not import that 7TV emote.",
                 ephemeral: true);
             return;
         }
