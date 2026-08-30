@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -8,33 +9,53 @@ public sealed class SevenTvEmojiService(HttpClient httpClient, ILogger<SevenTvEm
 {
     private const string ApiBaseUrl = "https://7tv.io/v3/emotes/";
 
-    public async Task<SevenTvEmojiAsset?> GetEmojiAsync(string emoteId)
+    public async Task<SevenTvEmojiLookupResult> GetEmojiAsync(string emoteId)
     {
         try
         {
             var response = await httpClient.GetFromJsonAsync<SevenTvEmoteResponse>($"{ApiBaseUrl}{emoteId}");
             if (response is null)
             {
-                return null;
+                return SevenTvEmojiLookupResult.Failed("I could not find that 7TV emote.");
             }
 
             var file = SelectBestFile(response);
-            if (file is null || string.IsNullOrWhiteSpace(response.Host.Url))
+            if (file is null)
             {
-                return null;
+                return SevenTvEmojiLookupResult.Failed(BuildMissingAssetMessage(response));
             }
 
-            return new SevenTvEmojiAsset(
+            if (string.IsNullOrWhiteSpace(response.Host.Url))
+            {
+                return SevenTvEmojiLookupResult.Failed("7TV did not provide a download location for that emote.");
+            }
+
+            if (response.Animated && string.Equals(file.Format, "WEBP", StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogInformation(
+                    "Using animated WebP fallback {FileName} ({FileSize} bytes) for 7TV emote {EmoteId}.",
+                    file.Name,
+                    file.Size,
+                    emoteId);
+            }
+
+            return SevenTvEmojiLookupResult.Found(new SevenTvEmojiAsset(
                 response.Id,
                 BuildDefaultEmojiName(response.Name),
                 response.Animated,
                 BuildCdnUrl(response.Host.Url, file.Name),
-                file.ConvertToPngBeforeUpload);
+                file.ConvertToPngBeforeUpload));
         }
-        catch (Exception exception) when (exception is HttpRequestException or JsonException or NotSupportedException)
+        catch (HttpRequestException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            logger.LogInformation("7TV emote {EmoteId} was not found.", emoteId);
+            return SevenTvEmojiLookupResult.Failed("I could not find that 7TV emote.");
+        }
+        catch (Exception exception) when (
+            exception is HttpRequestException or JsonException or NotSupportedException or TaskCanceledException)
         {
             logger.LogWarning(exception, "Failed to fetch 7TV emote {EmoteId}.", emoteId);
-            return null;
+            return SevenTvEmojiLookupResult.Failed("I could not retrieve that 7TV emote right now.");
         }
     }
 
@@ -44,20 +65,19 @@ public sealed class SevenTvEmojiService(HttpClient httpClient, ILogger<SevenTvEm
 
         if (response.Animated)
         {
-            return files
-                .Where(file => string.Equals(file.Format, "GIF", StringComparison.OrdinalIgnoreCase))
-                .Where(file => file.Size <= EmojiImageOptimizer.DiscordEmojiSizeLimitBytes)
-                .OrderByDescending(file => file.Width * file.Height)
-                .ThenByDescending(file => file.Size)
-                .Select(file => new SevenTvSelectedFile(file.Name, ConvertToPngBeforeUpload: false))
-                .FirstOrDefault();
+            return SelectBestSizedFile(files, "GIF", convertToPngBeforeUpload: false)
+                ?? SelectBestSizedFile(files, "WEBP", convertToPngBeforeUpload: false);
         }
 
         var pngFile = files
             .Where(file => string.Equals(file.Format, "PNG", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(file => file.Width * file.Height)
             .ThenByDescending(file => file.Size)
-            .Select(file => new SevenTvSelectedFile(file.Name, ConvertToPngBeforeUpload: false))
+            .Select(file => new SevenTvSelectedFile(
+                file.Name,
+                file.Format,
+                file.Size,
+                ConvertToPngBeforeUpload: false))
             .FirstOrDefault();
 
         if (pngFile is not null)
@@ -69,8 +89,41 @@ public sealed class SevenTvEmojiService(HttpClient httpClient, ILogger<SevenTvEm
             .Where(file => string.Equals(file.Format, "WEBP", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(file => file.Width * file.Height)
             .ThenByDescending(file => file.Size)
-            .Select(file => new SevenTvSelectedFile(file.Name, ConvertToPngBeforeUpload: true))
+            .Select(file => new SevenTvSelectedFile(
+                file.Name,
+                file.Format,
+                file.Size,
+                ConvertToPngBeforeUpload: true))
             .FirstOrDefault();
+    }
+
+    private static SevenTvSelectedFile? SelectBestSizedFile(
+        IReadOnlyList<SevenTvFile> files,
+        string format,
+        bool convertToPngBeforeUpload) =>
+        files
+            .Where(file => string.Equals(file.Format, format, StringComparison.OrdinalIgnoreCase))
+            .Where(file => file.Size <= EmojiImageOptimizer.DiscordEmojiSizeLimitBytes)
+            .OrderByDescending(file => file.Width * file.Height)
+            .ThenByDescending(file => file.Size)
+            .Select(file => new SevenTvSelectedFile(file.Name, file.Format, file.Size, convertToPngBeforeUpload))
+            .FirstOrDefault();
+
+    private static string BuildMissingAssetMessage(SevenTvEmoteResponse response)
+    {
+        var supportedFormats = response.Animated ? new[] { "GIF", "WEBP" } : new[] { "PNG", "WEBP" };
+        var smallestFile = response.Host.Files
+            .Where(file => supportedFormats.Contains(file.Format, StringComparer.OrdinalIgnoreCase))
+            .MinBy(file => file.Size);
+
+        if (smallestFile is null)
+        {
+            var formatList = string.Join(" or ", supportedFormats);
+            return $"7TV does not provide a {formatList} file for that emote.";
+        }
+
+        var sizeInKilobytes = (int)Math.Ceiling(smallestFile.Size / 1024d);
+        return $"The smallest compatible file 7TV provides is {sizeInKilobytes} KB, above Discord's 256 KB emoji limit.";
     }
 
     private static string BuildDefaultEmojiName(string name)
@@ -88,7 +141,11 @@ public sealed class SevenTvEmojiService(HttpClient httpClient, ILogger<SevenTvEm
         return $"{absoluteHostUrl.TrimEnd('/')}/{fileName}";
     }
 
-    private sealed record SevenTvSelectedFile(string Name, bool ConvertToPngBeforeUpload);
+    private sealed record SevenTvSelectedFile(
+        string Name,
+        string Format,
+        int Size,
+        bool ConvertToPngBeforeUpload);
 
     private sealed record SevenTvEmoteResponse(
         [property: JsonPropertyName("id")] string Id,

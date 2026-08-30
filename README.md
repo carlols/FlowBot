@@ -197,7 +197,7 @@ Required permissions:
 
 ### `/import-7tv-emoji`
 
-Imports a 7TV emote into the server from a 7TV emote link or raw emote ID. FlowBot fetches 7TV metadata, suggests the 7TV emote name in a private rename form, then uploads the largest available Discord-compatible asset it can find. Animated 7TV emotes use the largest GIF that is already under Discord's 256 KB emoji size limit. Static 7TV emotes prefer PNG and fall back to converting WEBP to PNG when 7TV does not expose a PNG file.
+Imports a 7TV emote into the server from a 7TV emote link or raw emote ID. FlowBot fetches 7TV metadata, suggests the 7TV emote name in a private rename form, then uploads the largest available Discord-compatible asset it can find. Animated 7TV emotes prefer the largest GIF already under Discord's 256 KB emoji size limit and fall back to an animated WebP under the limit when no GIF fits. Static 7TV emotes prefer PNG and fall back to converting WebP to PNG when 7TV does not expose a PNG file.
 
 Required permissions:
 
