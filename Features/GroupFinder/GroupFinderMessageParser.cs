@@ -66,8 +66,21 @@ public static partial class GroupFinderMessageParser
         }
 
         var noticeValue = FindFieldValue(embed, GroupFinderMessageBuilder.NoticeFieldName);
-        var playerMatches = PlayerLineRegex()
-            .Matches(FindFieldValue(embed, GroupFinderMessageBuilder.PlayersFieldName));
+        var playerFields = embed.Fields
+            .Where(field => IsFieldOrContinuation(field.Name, GroupFinderMessageBuilder.PlayersFieldName))
+            .ToArray();
+
+        if (playerFields.Length == 0)
+        {
+            playerFields = embed.Fields
+                .Where(field => ReadTeamNumber(field.Name) is not null)
+                .ToArray();
+        }
+
+        var playerFieldValue = string.Join(
+            Environment.NewLine,
+            playerFields.Select(field => field.Value ?? string.Empty));
+        var playerMatches = PlayerLineRegex().Matches(playerFieldValue);
 
         ReadPlayers(playerMatches, out var playerIds, out var readyStates);
 
@@ -127,13 +140,18 @@ public static partial class GroupFinderMessageParser
         var assignedPlayerIds = new HashSet<ulong>();
         var teams = new List<IReadOnlyList<ulong>>();
         var teamFields = fields
-            .Where(field => field.Name.StartsWith(GroupFinderMessageBuilder.TeamFieldPrefix, StringComparison.Ordinal))
-            .OrderBy(field => ReadTeamNumber(field.Name));
+            .Select(field => (Field: field, TeamNumber: ReadTeamNumber(field.Name)))
+            .Where(item => item.TeamNumber is not null)
+            .GroupBy(item => item.TeamNumber!.Value)
+            .OrderBy(group => group.Key);
 
-        foreach (var teamField in teamFields)
+        foreach (var teamFieldGroup in teamFields)
         {
+            var teamFieldValue = string.Join(
+                Environment.NewLine,
+                teamFieldGroup.Select(item => item.Field.Value ?? string.Empty));
             var teamPlayerIds = PlayerMentionRegex()
-                .Matches(teamField.Value ?? string.Empty)
+                .Matches(teamFieldValue)
                 .Select(match => ulong.TryParse(match.Groups["id"].Value, out var playerId)
                     ? playerId
                     : 0)
@@ -152,12 +170,18 @@ public static partial class GroupFinderMessageParser
         return teams;
     }
 
-    private static int ReadTeamNumber(string fieldName) =>
-        int.TryParse(
-            fieldName[GroupFinderMessageBuilder.TeamFieldPrefix.Length..],
-            out var teamNumber)
-                ? teamNumber
-                : int.MaxValue;
+    private static bool IsFieldOrContinuation(string fieldName, string baseFieldName) =>
+        fieldName == baseFieldName
+        || fieldName.StartsWith($"{baseFieldName} (", StringComparison.Ordinal);
+
+    private static int? ReadTeamNumber(string fieldName)
+    {
+        var match = TeamFieldNameRegex().Match(fieldName);
+
+        return match.Success && int.TryParse(match.Groups["number"].Value, out var teamNumber)
+            ? teamNumber
+            : null;
+    }
 
     private static long? TryReadTimestamp(string value)
     {
@@ -192,4 +216,7 @@ public static partial class GroupFinderMessageParser
 
     [GeneratedRegex("<t:(?<timestamp>\\d+):[a-zA-Z]>")]
     private static partial Regex TimestampRegex();
+
+    [GeneratedRegex("^Team (?<number>\\d+)(?: \\(\\d+\\))?$")]
+    private static partial Regex TeamFieldNameRegex();
 }

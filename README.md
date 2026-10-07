@@ -217,7 +217,7 @@ Creates a joinable group finder message for a game or activity. The creator is a
 Parameters:
 
 - `game-name`: required game or activity name.
-- `group-size`: optional max players, including the creator. Supports 1-30. Leave it empty if anyone can join.
+- `group-size`: optional max players, including the creator. Supports 1-100. Leave it empty if anyone can join.
 - `description`: optional short note about what you want to do.
 - `role-to-ping`: optional role to notify when the group is posted.
 - `time`: optional start time. Supports `20:00`, `17.00`, `today 20:00`, `tomorrow 20:00`, and `2026-04-28 20:00`.
