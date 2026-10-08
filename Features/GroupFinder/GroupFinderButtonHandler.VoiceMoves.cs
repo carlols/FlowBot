@@ -129,29 +129,16 @@ public sealed partial class GroupFinderButtonHandler
         VoiceMoveResult result,
         int disconnectedPlayerCount)
     {
-        var summary = result.MovedUsers.Count > 0
-            ? $"Moved {result.MovedUsers.Count} registered player(s) to {destinationChannel.Mention}."
-            : $"No registered players needed to be moved to {destinationChannel.Mention}.";
+        var additionalDetails = disconnectedPlayerCount > 0
+            ? new[] { $"{disconnectedPlayerCount} registered player(s) were not connected to voice." }
+            : [];
 
-        if (result.AlreadyInDestination.Count > 0)
-        {
-            summary += $" {result.AlreadyInDestination.Count} were already there.";
-        }
-
-        if (disconnectedPlayerCount > 0)
-        {
-            summary += $" {disconnectedPlayerCount} registered player(s) were not connected to voice.";
-        }
-
-        if (result.FailedUsers.Count > 0)
-        {
-            var failedMentions = string.Join(", ", result.FailedUsers.Take(10).Select(user => user.Mention));
-            var remainingCount = result.FailedUsers.Count - 10;
-            var remainingText = remainingCount > 0 ? $", and {remainingCount} more" : string.Empty;
-            summary += $" Failed to move {result.FailedUsers.Count}: {failedMentions}{remainingText}.";
-        }
-
-        return summary;
+        return VoiceMoveSummaryBuilder.Build(
+            result,
+            $"Moved {result.MovedUsers.Count} registered player(s) to {destinationChannel.Mention}.",
+            $"No registered players needed to be moved to {destinationChannel.Mention}.",
+            count => $"{count} were already there.",
+            additionalDetails);
     }
 
     private static Task ModifyPickerResponseAsync(SocketMessageComponent component, string content) =>

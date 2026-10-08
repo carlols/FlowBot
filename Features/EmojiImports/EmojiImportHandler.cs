@@ -1,16 +1,26 @@
-using System.Net.Http;
-using Discord;
-using Discord.Net;
 using Discord.WebSocket;
 
 namespace FlowBot;
 
-public sealed class EmojiImportHandler(
-    HttpClient httpClient,
-    SevenTvEmojiService sevenTvEmojiService,
-    EmojiImageOptimizer imageOptimizer,
-    ILogger<EmojiImportHandler> logger)
+public sealed partial class EmojiImportHandler
 {
+    private readonly HttpClient _httpClient;
+    private readonly SevenTvEmojiService _sevenTvEmojiService;
+    private readonly EmojiImageOptimizer _imageOptimizer;
+    private readonly ILogger<EmojiImportHandler> _logger;
+
+    public EmojiImportHandler(
+        HttpClient httpClient,
+        SevenTvEmojiService sevenTvEmojiService,
+        EmojiImageOptimizer imageOptimizer,
+        ILogger<EmojiImportHandler> logger)
+    {
+        _httpClient = httpClient;
+        _sevenTvEmojiService = sevenTvEmojiService;
+        _imageOptimizer = imageOptimizer;
+        _logger = logger;
+    }
+
     public async Task HandleComponentAsync(SocketMessageComponent component)
     {
         if (component.Data.CustomId != EmojiImportIds.EmojiSelectId)
@@ -63,10 +73,7 @@ public sealed class EmojiImportHandler(
             return;
         }
 
-        if (guild.CurrentUser is not null
-            && !guild.CurrentUser.GuildPermissions.ManageEmojisAndStickers
-            && !guild.CurrentUser.GuildPermissions.CreateGuildExpressions
-            && !guild.CurrentUser.GuildPermissions.Administrator)
+        if (!CanManageEmojis(guild))
         {
             await modal.RespondAsync(
                 "Flowbot needs the `Manage Emojis and Stickers` permission to import emojis.",
@@ -93,178 +100,16 @@ public sealed class EmojiImportHandler(
             return;
         }
 
-        await modal.DeferAsync(ephemeral: true);
-
-        var asset = await ResolveImportAssetAsync(state);
-        if (asset is null)
-        {
-            await modal.FollowupAsync(
-                "I could not find that emoji source anymore. The original emote may have been deleted or changed.",
-                ephemeral: true);
-            return;
-        }
-
-        byte[]? imageBytes = null;
-
-        try
-        {
-            imageBytes = await DownloadAndPrepareImageAsync(asset);
-            if (imageBytes is null)
-            {
-                await modal.FollowupAsync(
-                    "I could not prepare that emoji image for upload.",
-                    ephemeral: true);
-                return;
-            }
-
-            var createdEmoji = await CreateEmoteAsync(guild, emojiName, imageBytes);
-
-            await modal.FollowupAsync($"Imported {createdEmoji} as `:{createdEmoji.Name}:`.", ephemeral: true);
-        }
-        catch (HttpException exception) when (ShouldTryOptimization(exception))
-        {
-            if (asset.IsAnimated)
-            {
-                logger.LogInformation(
-                    "Skipping optimization for animated emoji {EmojiId} in server {GuildId}.",
-                    asset.LogId,
-                    guild.Id);
-
-                await modal.FollowupAsync(
-                    "Discord rejected that animated emoji because it could not resize the asset below 256 KB. Flowbot skips animated emoji optimization so the bot can stay online.",
-                    ephemeral: true);
-                return;
-            }
-
-            await TryOptimizeAndImportStaticImageAsync(modal, guild, asset, emojiName, imageBytes!);
-        }
-        catch (HttpException exception)
-        {
-            logger.LogWarning(exception, "Failed to import emoji {EmojiId} into server {GuildId}.", asset.LogId, guild.Id);
-            await modal.FollowupAsync(
-                BuildDiscordUploadFailureMessage(exception),
-                ephemeral: true);
-        }
-        catch (HttpRequestException exception)
-        {
-            logger.LogWarning(exception, "Failed to download emoji {EmojiId}.", asset.LogId);
-            await modal.FollowupAsync(
-                "I could not download that emoji. It may no longer be available.",
-                ephemeral: true);
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "Failed to import emoji {EmojiId} into server {GuildId}.", asset.LogId, guild.Id);
-            await modal.FollowupAsync(
-                "I could not import that emoji because an unexpected error occurred.",
-                ephemeral: true);
-        }
+        await ImportAsync(modal, guild, state, emojiName);
     }
 
-    private async Task TryOptimizeAndImportStaticImageAsync(
-        SocketModal modal,
-        SocketGuild guild,
-        EmojiImportAsset asset,
-        string emojiName,
-        byte[] imageBytes)
+    private static bool CanManageEmojis(SocketGuild guild)
     {
-        try
-        {
-            var optimizationResult = imageOptimizer.OptimizeStaticImage(imageBytes);
+        var currentUser = guild.CurrentUser;
 
-            if (optimizationResult is null)
-            {
-                await modal.FollowupAsync(
-                    "Discord rejected that emoji because it could not resize the asset below 256 KB, and Flowbot could not lightly optimize it enough.",
-                    ephemeral: true);
-                return;
-            }
-
-            var createdEmoji = await CreateEmoteAsync(guild, emojiName, optimizationResult.ImageBytes);
-
-            await modal.FollowupAsync(
-                $"Imported {createdEmoji} as `:{createdEmoji.Name}:`. Flowbot lightly optimized it first: {optimizationResult.Description}.",
-                ephemeral: true);
-        }
-        catch (HttpException exception)
-        {
-            logger.LogWarning(exception, "Failed to import optimized emoji {EmojiId} into server {GuildId}.", asset.LogId, guild.Id);
-            await modal.FollowupAsync(BuildDiscordUploadFailureMessage(exception), ephemeral: true);
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "Failed to optimize and import emoji {EmojiId} into server {GuildId}.", asset.LogId, guild.Id);
-            await modal.FollowupAsync(
-                "I could not import that emoji because image optimization failed unexpectedly.",
-                ephemeral: true);
-        }
+        return currentUser is null
+            || currentUser.GuildPermissions.ManageEmojisAndStickers
+            || currentUser.GuildPermissions.CreateGuildExpressions
+            || currentUser.GuildPermissions.Administrator;
     }
-
-    private async Task<EmojiImportAsset?> ResolveImportAssetAsync(EmojiImportModalState state)
-    {
-        if (state.Source == EmojiImportSource.Discord)
-        {
-            return new EmojiImportAsset(
-                state.LogId,
-                state.IsAnimated,
-                $"https://cdn.discordapp.com/emojis/{state.SourceId}.{(state.IsAnimated ? "gif" : "png")}",
-                ConvertToPngBeforeUpload: false);
-        }
-
-        var lookupResult = await sevenTvEmojiService.GetEmojiAsync(state.SourceId);
-        if (lookupResult.Asset is not { } sevenTvEmoji)
-        {
-            return null;
-        }
-
-        return new EmojiImportAsset(
-            state.LogId,
-            sevenTvEmoji.IsAnimated,
-            sevenTvEmoji.CdnUrl,
-            sevenTvEmoji.ConvertToPngBeforeUpload);
-    }
-
-    private async Task<byte[]?> DownloadAndPrepareImageAsync(EmojiImportAsset asset)
-    {
-        var imageBytes = await httpClient.GetByteArrayAsync(asset.CdnUrl);
-
-        return asset.ConvertToPngBeforeUpload
-            ? imageOptimizer.ConvertStaticImageToPng(imageBytes)
-            : imageBytes;
-    }
-
-    private static async Task<GuildEmote> CreateEmoteAsync(
-        SocketGuild guild,
-        string emojiName,
-        byte[] imageBytes)
-    {
-        await using var imageStream = new MemoryStream(imageBytes);
-        using var image = new Image(imageStream);
-
-        return await guild.CreateEmoteAsync(emojiName, image);
-    }
-
-    private static bool ShouldTryOptimization(HttpException exception) =>
-        exception.DiscordCode == DiscordErrorCode.FailedToResizeAssetBelowTheMaximumSize;
-
-    private static string BuildDiscordUploadFailureMessage(HttpException exception)
-    {
-        if (exception.DiscordCode == DiscordErrorCode.FailedToResizeAssetBelowTheMaximumSize)
-        {
-            return "Discord rejected that emoji because it could not resize the asset below 256 KB.";
-        }
-
-        return string.IsNullOrWhiteSpace(exception.Reason)
-            ? "Discord rejected that emoji upload."
-            : $"Discord rejected that emoji upload: {exception.Reason}";
-    }
-
-    private static SocketGuild? GetGuild(SocketModal modal) =>
-        (modal.User as SocketGuildUser)?.Guild
-        ?? (modal.Channel as SocketGuildChannel)?.Guild;
-
-    private static SocketGuild? GetGuild(SocketMessageComponent component) =>
-        (component.User as SocketGuildUser)?.Guild
-        ?? (component.Channel as SocketGuildChannel)?.Guild;
-
 }
