@@ -17,7 +17,7 @@ public sealed record GroupFinderSession(
     public const int MinCapacity = 1;
     public const int MaxGameNameLength = 256;
     public const int MaxDescriptionLength = 4096;
-    public const int MaxCapacity = 30;
+    public const int MaxCapacity = 100;
 
     public bool IsFull => Capacity is { } capacity && PlayerIds.Count >= capacity;
 

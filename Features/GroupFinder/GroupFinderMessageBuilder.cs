@@ -37,8 +37,12 @@ public static class GroupFinderMessageBuilder
             embed.AddField("Ready Check", "Active", inline: true);
         }
 
-        embed.AddField(PlayersFieldName, FormatPlayers(session));
-        AddTeamFields(embed, session.TeamIds);
+        if (session.TeamIds.Count == 0)
+        {
+            AddPlayerFields(embed, session);
+        }
+
+        AddTeamFields(embed, session);
 
         return embed.Build();
     }
@@ -99,16 +103,72 @@ public static class GroupFinderMessageBuilder
             .Build();
     }
 
-    private static void AddTeamFields(EmbedBuilder embed, IReadOnlyList<IReadOnlyList<ulong>> teamIds)
+    private static void AddTeamFields(EmbedBuilder embed, GroupFinderSession session)
     {
-        for (var index = 0; index < teamIds.Count; index++)
+        for (var index = 0; index < session.TeamIds.Count; index++)
         {
-            if (teamIds[index].Count == 0)
+            if (session.TeamIds[index].Count == 0)
             {
                 continue;
             }
 
-            embed.AddField($"{TeamFieldPrefix}{index + 1}", FormatTeam(teamIds[index]), inline: true);
+            AddChunkedFields(
+                embed,
+                $"{TeamFieldPrefix}{index + 1}",
+                FormatPlayerLines(session.TeamIds[index], session.ReadyStates),
+                inline: true);
+        }
+    }
+
+    private static void AddPlayerFields(EmbedBuilder embed, GroupFinderSession session)
+    {
+        if (session.PlayerIds.Count == 0)
+        {
+            embed.AddField(PlayersFieldName, "No players yet.");
+            return;
+        }
+
+        AddChunkedFields(embed, PlayersFieldName, FormatPlayerLines(session));
+    }
+
+    private static void AddChunkedFields(
+        EmbedBuilder embed,
+        string fieldName,
+        IEnumerable<string> lines,
+        bool inline = false)
+    {
+        var chunks = new List<string>();
+        var currentChunk = new List<string>();
+        var currentLength = 0;
+
+        foreach (var line in lines)
+        {
+            var addedLength = line.Length + (currentChunk.Count == 0 ? 0 : Environment.NewLine.Length);
+
+            if (currentChunk.Count > 0 && currentLength + addedLength > EmbedFieldBuilder.MaxFieldValueLength)
+            {
+                chunks.Add(string.Join(Environment.NewLine, currentChunk));
+                currentChunk.Clear();
+                currentLength = 0;
+                addedLength = line.Length;
+            }
+
+            currentChunk.Add(line);
+            currentLength += addedLength;
+        }
+
+        if (currentChunk.Count > 0)
+        {
+            chunks.Add(string.Join(Environment.NewLine, currentChunk));
+        }
+
+        for (var index = 0; index < chunks.Count; index++)
+        {
+            var chunkFieldName = index == 0
+                ? fieldName
+                : $"{fieldName} ({index + 1})";
+
+            embed.AddField(chunkFieldName, chunks[index], inline);
         }
     }
 
@@ -126,29 +186,20 @@ public static class GroupFinderMessageBuilder
         return $"{session.PlayerIds.Count} people interested";
     }
 
-    private static string FormatPlayers(GroupFinderSession session)
-    {
-        if (session.PlayerIds.Count == 0)
+    private static IEnumerable<string> FormatPlayerLines(GroupFinderSession session) =>
+        FormatPlayerLines(session.PlayerIds, session.ReadyStates);
+
+    private static IEnumerable<string> FormatPlayerLines(
+        IReadOnlyList<ulong> playerIds,
+        IReadOnlyDictionary<ulong, GroupFinderReadyState> readyStates) =>
+        playerIds.Select((playerId, index) =>
         {
-            return "No players yet.";
-        }
+            var row = $"{index + 1}. <@{playerId}>";
 
-        return string.Join(
-            Environment.NewLine,
-            session.PlayerIds.Select((playerId, index) =>
-            {
-                var row = $"{index + 1}. <@{playerId}>";
-
-                return session.ReadyStates.TryGetValue(playerId, out var state)
-                    ? $"{row} - {FormatReadyState(state)}"
-                    : row;
-            }));
-    }
-
-    private static string FormatTeam(IReadOnlyList<ulong> playerIds) =>
-        string.Join(
-            Environment.NewLine,
-            playerIds.Select((playerId, index) => $"{index + 1}. <@{playerId}>"));
+            return readyStates.TryGetValue(playerId, out var state)
+                ? $"{row} - {FormatReadyState(state)}"
+                : row;
+        });
 
     private static string FormatReadyState(GroupFinderReadyState state) =>
         state switch
