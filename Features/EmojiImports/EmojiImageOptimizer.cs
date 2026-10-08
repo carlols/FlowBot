@@ -6,7 +6,7 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
 {
     public const int DiscordEmojiSizeLimitBytes = 256 * 1024;
 
-    private const int MaxOptimizableImageBytes = 2 * 1024 * 1024;
+    private const int MaxProcessableImageBytes = 2 * 1024 * 1024;
     private static readonly SemaphoreSlim OptimizationLock = new(1, 1);
     private static readonly int?[] DimensionSteps = [null, 128, 112, 96, 80, 64];
 
@@ -23,45 +23,22 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
 
     public EmojiImageOptimizationResult? OptimizeStaticImage(byte[] imageBytes)
     {
-        if (imageBytes.Length > MaxOptimizableImageBytes)
+        if (!CanProcess(imageBytes, "optimization"))
         {
-            logger.LogInformation(
-                "Skipping emoji optimization because the source image is {ImageSize} bytes, above the {Limit} byte safety limit.",
-                imageBytes.Length,
-                MaxOptimizableImageBytes);
             return null;
         }
 
-        if (!OptimizationLock.Wait(TimeSpan.FromSeconds(2)))
-        {
-            logger.LogInformation("Skipping emoji optimization because another optimization is already running.");
-            return null;
-        }
-
-        try
-        {
-            return Optimize(imageBytes);
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "Failed to optimize emoji image.");
-            return null;
-        }
-        finally
-        {
-            OptimizationLock.Release();
-        }
+        return RunExclusive("optimization", () => Optimize(imageBytes));
     }
 
     public byte[]? ConvertStaticImageToPng(byte[] imageBytes)
     {
-        if (!OptimizationLock.Wait(TimeSpan.FromSeconds(2)))
+        if (!CanProcess(imageBytes, "conversion"))
         {
-            logger.LogInformation("Skipping image conversion because another image operation is already running.");
             return null;
         }
 
-        try
+        return RunExclusive("conversion", () =>
         {
             using var image = new MagickImage(imageBytes);
             image.Strip();
@@ -69,10 +46,42 @@ public sealed class EmojiImageOptimizer(ILogger<EmojiImageOptimizer> logger)
             using var stream = new MemoryStream();
             image.Write(stream, MagickFormat.Png);
             return stream.ToArray();
+        });
+    }
+
+    private bool CanProcess(byte[] imageBytes, string operationName)
+    {
+        if (imageBytes.Length <= MaxProcessableImageBytes)
+        {
+            return true;
+        }
+
+        logger.LogInformation(
+            "Skipping emoji image {Operation} because the source is {ImageSize} bytes, above the {Limit} byte safety limit.",
+            operationName,
+            imageBytes.Length,
+            MaxProcessableImageBytes);
+        return false;
+    }
+
+    private T? RunExclusive<T>(string operationName, Func<T?> operation)
+        where T : class
+    {
+        if (!OptimizationLock.Wait(TimeSpan.FromSeconds(2)))
+        {
+            logger.LogInformation(
+                "Skipping emoji image {Operation} because another image operation is already running.",
+                operationName);
+            return null;
+        }
+
+        try
+        {
+            return operation();
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Failed to convert emoji image to PNG.");
+            logger.LogWarning(exception, "Failed emoji image {Operation}.", operationName);
             return null;
         }
         finally

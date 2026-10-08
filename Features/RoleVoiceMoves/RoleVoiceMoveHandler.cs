@@ -87,25 +87,11 @@ public sealed class RoleVoiceMoveHandler(VoiceMemberMover voiceMemberMover)
     private static string BuildMoveSummary(
         SocketRole role,
         SocketVoiceChannel destinationChannel,
-        VoiceMoveResult result)
-    {
-        var summary = result.MovedUsers.Count > 0
-            ? $"Moved {result.MovedUsers.Count} connected member(s) with {role.Mention} to {destinationChannel.Mention}."
-            : $"No connected members with {role.Mention} need to be moved to {destinationChannel.Mention}.";
-
-        if (result.AlreadyInDestination.Count > 0)
-        {
-            summary += $" {result.AlreadyInDestination.Count} matching member(s) were already there.";
-        }
-
-        if (result.FailedUsers.Count > 0)
-        {
-            var failedMentions = string.Join(", ", result.FailedUsers.Take(10).Select(user => user.Mention));
-            var remainingCount = result.FailedUsers.Count - 10;
-            var remainingText = remainingCount > 0 ? $", and {remainingCount} more" : string.Empty;
-            summary += $" Failed to move {result.FailedUsers.Count} member(s): {failedMentions}{remainingText}.";
-        }
-
-        return summary;
-    }
+        VoiceMoveResult result) =>
+        VoiceMoveSummaryBuilder.Build(
+            result,
+            $"Moved {result.MovedUsers.Count} connected member(s) with {role.Mention} to {destinationChannel.Mention}.",
+            $"No connected members with {role.Mention} need to be moved to {destinationChannel.Mention}.",
+            count => $"{count} matching member(s) were already there.",
+            formatFailureHeading: count => $"Failed to move {count} member(s):");
 }

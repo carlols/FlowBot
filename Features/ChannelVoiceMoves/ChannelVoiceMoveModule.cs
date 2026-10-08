@@ -71,20 +71,9 @@ public sealed class ChannelVoiceMoveModule(VoiceMemberMover voiceMemberMover)
     private static string BuildMoveSummary(
         SocketVoiceChannel sourceChannel,
         SocketVoiceChannel destinationChannel,
-        VoiceMoveResult result)
-    {
-        var summary = result.MovedUsers.Count > 0
-            ? $"Moved {result.MovedUsers.Count} member(s) from {sourceChannel.Mention} to {destinationChannel.Mention}."
-            : $"No members were moved from {sourceChannel.Mention} to {destinationChannel.Mention}.";
-
-        if (result.FailedUsers.Count > 0)
-        {
-            var failedMentions = string.Join(", ", result.FailedUsers.Take(10).Select(user => user.Mention));
-            var remainingCount = result.FailedUsers.Count - 10;
-            var remainingText = remainingCount > 0 ? $", and {remainingCount} more" : string.Empty;
-            summary += $" Failed to move {result.FailedUsers.Count}: {failedMentions}{remainingText}.";
-        }
-
-        return summary;
-    }
+        VoiceMoveResult result) =>
+        VoiceMoveSummaryBuilder.Build(
+            result,
+            $"Moved {result.MovedUsers.Count} member(s) from {sourceChannel.Mention} to {destinationChannel.Mention}.",
+            $"No members were moved from {sourceChannel.Mention} to {destinationChannel.Mention}.");
 }
